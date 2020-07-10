@@ -7,14 +7,22 @@ of the modules.
 Documentation
 -------------
 
-Please notice you can generate the manual and the workshop from the sources. In addition, pregenerated versions of them are available.
+You can generate the workshop documentation from the sources.
+*  In HTML format
 
+        xsltproc --stringparam html.stylesheet "docbook.css" --xinclude -o index.html /usr/share/xml/docbook/stylesheet/docbook-xsl/html/chunk.xsl mobilitydb-workshop.xml
+*  In PDF format
 
-HTML: https://docs.mobilitydb.com/MobilityDB/master/workshop/
+        dblatex -s texstyle.sty -T native -t pdf -o mobilitydb-workshop.pdf mobilitydb-workshop.xml
+* In EPUB format
 
-PDF: https://docs.mobilitydb.com/MobilityDB/master/workshop/workshop.pdf
+        dbtoepub -o mobilitydb-workshop.epub mobilitydb-workshop.xml
 
-EPUB: https://docs.mobilitydb.com/MobilityDB/master/workshop/workshop.epub
+In addition, pregenerated versions of them are available.
+
+*  In HTML format: https://docs.mobilitydb.com/MobilityDB/master/workshop/
+*  In PDF format: https://docs.mobilitydb.com/MobilityDB/master/workshop/workshop.pdf
+* In EPUB format: https://docs.mobilitydb.com/MobilityDB/master/workshop/workshop.epub
 
 License
 -------

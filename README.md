@@ -20,9 +20,9 @@ You can generate the workshop documentation from the sources.
 
 In addition, pregenerated versions of them are available.
 
-*  In HTML format: https://docs.mobilitydb.com/MobilityDB/master/workshop/
-*  In PDF format: https://docs.mobilitydb.com/MobilityDB/master/workshop/workshop.pdf
-* In EPUB format: https://docs.mobilitydb.com/MobilityDB/master/workshop/workshop.epub
+*  In HTML format: https://docs.mobilitydb.com/MobilityDB-workshop/master/
+*  In PDF format: https://docs.mobilitydb.com/MobilityDB-workshop/master/mobilitydb-workshop.pdf
+* In EPUB format: https://docs.mobilitydb.com/MobilityDB-workshop/master/mobilitydb-workshop.epub
 
 License
 -------

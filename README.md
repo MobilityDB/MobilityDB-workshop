@@ -24,6 +24,33 @@ In addition, pregenerated versions of them are available.
 *  In PDF format: https://docs.mobilitydb.com/MobilityDB-workshop/master/mobilitydb-workshop.pdf
 * In EPUB format: https://docs.mobilitydb.com/MobilityDB-workshop/master/mobilitydb-workshop.epub
 
+Docker container
+-----------------
+
+The workshop dependencies and data files are available in a Docker container running PostgreSQL-12, PostGIS-2.5 and MobilityDB-develop.
+
+*  Pull the prebuilt image from the [Docker Hub Registry](https://hub.docker.com/r/mobilitydb/mobilitydb).
+
+        docker pull mobilitydb/mobilitydb:12-2.5-develop-workshop
+
+*  Create a Docker volume to preserve the PostgreSQL database files outside of the container.
+
+        docker volume create mobilitydb_data
+        
+ *  Run the Docker container.
+
+        docker run --name "mobilitydb" -d -p 5432 -v mobilitydb_data:/var/lib/postgresql mobilitydb/mobilitydb:12-2.5-develop-workshop 
+        
+ *  Enter into the Docker container.
+
+        docker exec -it mobilitydb bash
+        
+ *  Connect to the database  (username=docker,db=mobilitydb).
+
+        psql -U docker -d mobilitydb 
+
+ *  The workshop data files are available in the workshop directory inside the container.
+
 License
 -------
 

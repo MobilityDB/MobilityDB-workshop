@@ -452,10 +452,10 @@ BeltShips AS (
   FROM Ships S, B
   WHERE intersects(S.Trip, B.Belt)
 )
-SELECT S1.MMSI, S2.MMSI, S1.Traj, S2.Traj, shortestLine(S1.tripETRS, S2.tripETRS) Approach
+SELECT S1.MMSI, S2.MMSI, S1.Traj, S2.Traj, shortestLine(S1.trip, S2.trip) Approach
 FROM BeltShips S1, BeltShips S2
 WHERE S1.MMSI > S2.MMSI AND
-  dwithin(S1.tripETRS, S2.tripETRS, 300)
+dwithin(S1.trip, S2.trip, 300)
 --Total query runtime: 28.5 secs
 --7 rows retrieved.
 				</programlisting>

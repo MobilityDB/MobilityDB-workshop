@@ -305,7 +305,7 @@ UPDATE trip_stops t
 SET perc = CASE
 WHEN stop_sequence =  1 then 0.0
 WHEN stop_sequence =  no_stops then 1.0
-ELSE ST_LineLocatePoint(g.the_geom, s.the_geom)
+ELSE ST_LineLocatePoint(g.shape_geom, s.stop_geom)
 END
 FROM shape_geoms g, stops s
 WHERE t.shape_id = g.shape_id AND t.stop_id = s.stop_id;
@@ -347,7 +347,7 @@ WITH temp AS (
 SELECT * FROM temp WHERE stop_sequence2 IS NOT null;
 
 UPDATE trip_segs t
-SET seg_geom = ST_LineSubstring(g.the_geom, perc1, perc2)
+SET seg_geom = ST_LineSubstring(g.shape_geom, perc1, perc2)
 FROM shape_geoms g
 WHERE t.shape_id = g.shape_id;
 

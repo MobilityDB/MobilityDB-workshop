@@ -100,10 +100,10 @@ lon,lat,time
 			<programlisting>
 DROP TABLE IF EXISTS trips_input;
 CREATE TABLE trips_input (
-date date,
-lon float,
-lat float,
-time timestamptz
+	date date,
+	lon float,
+	lat float,
+	time timestamptz
 );
 
 COPY trips_input(lon, lat, time) FROM
@@ -114,15 +114,15 @@ SET date = date(time);
 
 DROP TABLE IF EXISTS trips_mdb;
 CREATE TABLE trips_mdb (
-date date NOT NULL,
-trip tgeompoint,
-trajectory geometry,
-PRIMARY KEY (date)
+	date date NOT NULL,
+	trip tgeompoint,
+	trajectory geometry,
+	PRIMARY KEY (date)
 );
 
 INSERT INTO trips_mdb(date, trip)
-SELECT date, tgeompointseq(array_agg(tgeompointinst(
-ST_SetSRID(ST_Point(lon, lat),4326), time) ORDER BY time))
+SELECT date, tgeompoint_seq(array_agg(tgeompoint_inst(
+  ST_SetSRID(ST_Point(lon, lat), 4326), time) ORDER BY time))
 FROM trips_input
 GROUP BY date;
 

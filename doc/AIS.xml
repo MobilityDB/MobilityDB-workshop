@@ -103,33 +103,33 @@ CREATE EXTENSION MobilityDB CASCADE;
 				Now create a table in which the CSV file will be loaded:
 				<programlisting>
 CREATE TABLE AISInput(
-T	timestamp,
-TypeOfMobile varchar(50),
-MMSI integer,
-Latitude float,
-Longitude float,
-navigationalStatus varchar(50),
-ROT float,
-SOG float,
-COG float,
-Heading integer,
-IMO varchar(50),
-Callsign varchar(50),
-Name varchar(100),
-ShipType varchar(50),
-CargoType varchar(100),
-Width float,
-Length float,
-TypeOfPositionFixingDevice varchar(50),
-Draught float,
-Destination varchar(50),
-ETA varchar(50),
-DataSourceType varchar(50),
-SizeA float,
-SizeB float,
-SizeC float,
-SizeD float,
-Geom geometry(Point, 4326)
+  T	timestamp,
+  TypeOfMobile varchar(50),
+  MMSI integer,
+  Latitude float,
+  Longitude float,
+  navigationalStatus varchar(50),
+  ROT float,
+  SOG float,
+  COG float,
+  Heading integer,
+  IMO varchar(50),
+  Callsign varchar(50),
+  Name varchar(100),
+  ShipType varchar(50),
+  CargoType varchar(100),
+  Width float,
+  Length float,
+  TypeOfPositionFixingDevice varchar(50),
+  Draught float,
+  Destination varchar(50),
+  ETA varchar(50),
+  DataSourceType varchar(50),
+  SizeA float,
+  SizeB float,
+  SizeC float,
+  SizeD float,
+  Geom geometry(Point, 4326)
 );
 				</programlisting>
 			</para>
@@ -141,9 +141,9 @@ Geom geometry(Point, 4326)
 				For importing CSV data into a PostgreSQL database one can use the <varname>COPY</varname> command as follows:
 				<programlisting>
 COPY AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus,
-ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length,
-TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType,
-SizeA, SizeB, SizeC, SizeD)
+  ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length,
+  TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType,
+  SizeA, SizeB, SizeC, SizeD)
 FROM '/home/mobilitydb/DanishAIS/aisdk_20180401.csv' DELIMITER  ',' CSV HEADER;
 				</programlisting>
 			</para>
@@ -154,12 +154,12 @@ FROM '/home/mobilitydb/DanishAIS/aisdk_20180401.csv' DELIMITER  ',' CSV HEADER;
 				We clean up some of the fields in the table and create spatial points with the following command.
 				<programlisting>
 UPDATE AISInput SET
-NavigationalStatus = CASE NavigationalStatus WHEN 'Unknown value' THEN NULL END,
-IMO = CASE IMO WHEN 'Unknown' THEN NULL END,
-ShipType = CASE ShipType WHEN 'Undefined' THEN NULL END,
-TypeOfPositionFixingDevice = CASE TypeOfPositionFixingDevice
-WHEN 'Undefined' THEN NULL END,
-Geom = ST_SetSRID( ST_MakePoint( Longitude, Latitude ), 4326);
+  NavigationalStatus = CASE NavigationalStatus WHEN 'Unknown value' THEN NULL END,
+  IMO = CASE IMO WHEN 'Unknown' THEN NULL END,
+  ShipType = CASE ShipType WHEN 'Undefined' THEN NULL END,
+  TypeOfPositionFixingDevice = CASE TypeOfPositionFixingDevice
+  WHEN 'Undefined' THEN NULL END,
+  Geom = ST_SetSRID( ST_MakePoint( Longitude, Latitude ), 4326);
 				</programlisting>
 			</para>
 			<para>
@@ -203,9 +203,9 @@ SELECT COUNT(*) FROM AISInputFiltered;
 				<programlisting>
 CREATE TABLE Ships(MMSI, Trip, SOG, COG) AS
 SELECT MMSI,
-tgeompointseq(array_agg(tgeompointinst( ST_Transform(Geom, 25832), T) ORDER BY T)),
-tfloatseq(array_agg(tfloatinst(SOG, T) ORDER BY T) FILTER (WHERE SOG IS NOT NULL)),
-tfloatseq(array_agg(tfloatinst(COG, T) ORDER BY T) FILTER (WHERE COG IS NOT NULL))
+  tgeompoint_seq(array_agg(tgeompoint_inst( ST_Transform(Geom, 25832), T) ORDER BY T)),
+  tfloat_seq(array_agg(tfloat_inst(SOG, T) ORDER BY T) FILTER (WHERE SOG IS NOT NULL)),
+  tfloat_seq(array_agg(tfloat_inst(COG, T) ORDER BY T) FILTER (WHERE COG IS NOT NULL))
 FROM AISInputFiltered
 GROUP BY MMSI;
 -- Query returned successfully: 2995 rows affected, 01:16 minutes execution time.
@@ -247,21 +247,21 @@ SELECT SUM( length( Trip ) ) FROM Ships;
 			<para>
 				<programlisting>
 WITH buckets (bucketNo, RangeKM) AS (
-SELECT 1, floatrange '[0, 0]' UNION
-SELECT 2, floatrange '(0, 50)' UNION
-SELECT 3, floatrange '[50, 100)' UNION
-SELECT 4, floatrange '[100, 200)' UNION
-SELECT 5, floatrange '[200, 500)' UNION
-SELECT 6, floatrange '[500, 1500)' UNION
-SELECT 7, floatrange '[1500, 10000)' ),
+  SELECT 1, floatrange '[0, 0]' UNION
+  SELECT 2, floatrange '(0, 50)' UNION
+  SELECT 3, floatrange '[50, 100)' UNION
+  SELECT 4, floatrange '[100, 200)' UNION
+  SELECT 5, floatrange '[200, 500)' UNION
+  SELECT 6, floatrange '[500, 1500)' UNION
+  SELECT 7, floatrange '[1500, 10000)' ),
 histogram AS (
-SELECT bucketNo, RangeKM, count(MMSI) as freq
-FROM buckets left outer join Ships on (length(Trip)/1000) &#x003C;&commat; RangeKM
-GROUP BY bucketNo, RangeKM
-ORDER BY bucketNo, RangeKM
+  SELECT bucketNo, RangeKM, count(MMSI) as freq
+  FROM buckets left outer join Ships on (length(Trip)/1000) &#x003C;&commat; RangeKM
+  GROUP BY bucketNo, RangeKM
+  ORDER BY bucketNo, RangeKM
 )
 SELECT bucketNo, RangeKM, freq,
-repeat('&#x25AA;', ( freq::float / max(freq) OVER () * 30 )::int ) AS bar
+  repeat('&#x25AA;', ( freq::float / max(freq) OVER () * 30 )::int ) AS bar
 FROM histogram;
 --Total query runtime: 5.6 secs
 
@@ -395,8 +395,8 @@ ORDER BY AzimuthDifference DESC;
 CREATE INDEX Ships_Trip_Idx ON Ships USING GiST(Trip);
 
 WITH Ports(Rodby, Puttgarden) AS (
-SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
-	ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
+  SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
+    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
 )
 SELECT S.*, Rodby, Puttgarden
 FROM Ports P, Ships S
@@ -419,11 +419,11 @@ WHERE intersects(S.Trip, P.Rodby) AND intersects(S.Trip, P.Puttgarden)
 				This query creates two envelope geometries that represent the locations of the two ports, then intersects them with the spatiotemporal trajectories of the ships. The <varname>intersects</varname> function checks whether a temporal point has ever intersects a geometry. To speed up the query, a spatiotemporal GiST index is first built on the <varname>Trip</varname> attribute. The query identified four Ships that commuted between the two ports, <xref linkend="imgtrajFerries"/>. To count how many one way trips each of them did, we extend the previous query as follows:
 				<programlisting>
 WITH Ports(Rodby, Puttgarden) AS (
-SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
-	ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
+  SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
+    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
 )
 SELECT MMSI, (numSequences(atGeometry(S.Trip, P.Rodby)) +
-numSequences(atGeometry(S.Trip, P.Puttgarden)))/2.0 AS NumTrips
+  numSequences(atGeometry(S.Trip, P.Puttgarden)))/2.0 AS NumTrips
 FROM Ports P, Ships S
 WHERE intersects(S.Trip, P.Rodby) AND intersects(S.Trip, P.Puttgarden)
 --Total query runtime: 1.1 secs
@@ -444,18 +444,18 @@ MMSI		NumTrips
 			<para>
 				<programlisting>
 WITH B(Belt) AS (
-SELECT ST_MakeEnvelope(640730, 6058230, 654100, 6042487, 25832)
+  SELECT ST_MakeEnvelope(640730, 6058230, 654100, 6042487, 25832)
 ),
 BeltShips AS (
-SELECT MMSI, atGeometry(S.Trip, B.Belt) AS Trip,
-	trajectory(atGeometry(S.Trip, B.Belt)) AS Traj
-FROM Ships S, B
-WHERE intersects(S.Trip, B.Belt)
+  SELECT MMSI, atGeometry(S.Trip, B.Belt) AS Trip,
+    trajectory(atGeometry(S.Trip, B.Belt)) AS Traj
+  FROM Ships S, B
+  WHERE intersects(S.Trip, B.Belt)
 )
 SELECT S1.MMSI, S2.MMSI, S1.Traj, S2.Traj, shortestLine(S1.tripETRS, S2.tripETRS) Approach
 FROM BeltShips S1, BeltShips S2
 WHERE S1.MMSI > S2.MMSI AND
-dwithin(S1.tripETRS, S2.tripETRS, 300)
+  dwithin(S1.tripETRS, S2.tripETRS, 300)
 --Total query runtime: 28.5 secs
 --7 rows retrieved.
 				</programlisting>

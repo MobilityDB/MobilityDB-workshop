@@ -63,125 +63,125 @@ unzip gtfs_data.zip
 		<para>We create the tables to be loaded with the data in the CSV files as follows.
 				<programlisting>
 CREATE TABLE agency (
-agency_id text DEFAULT '',
-agency_name text DEFAULT NULL,
-agency_url text DEFAULT NULL,
-agency_timezone text DEFAULT NULL,
-agency_lang text DEFAULT NULL,
-agency_phone text DEFAULT NULL,
-CONSTRAINT agency_pkey PRIMARY KEY (agency_id)
+  agency_id text DEFAULT '',
+  agency_name text DEFAULT NULL,
+  agency_url text DEFAULT NULL,
+  agency_timezone text DEFAULT NULL,
+  agency_lang text DEFAULT NULL,
+  agency_phone text DEFAULT NULL,
+  CONSTRAINT agency_pkey PRIMARY KEY (agency_id)
 );
 
 CREATE TABLE calendar (
-service_id text,
-monday int NOT NULL,
-tuesday int NOT NULL,
-wednesday int NOT NULL,
-thursday int NOT NULL,
-friday int NOT NULL,
-saturday int NOT NULL,
-sunday int NOT NULL,
-start_date date NOT NULL,
-end_date date NOT NULL,
-CONSTRAINT calendar_pkey PRIMARY KEY (service_id)
+  service_id text,
+  monday int NOT NULL,
+  tuesday int NOT NULL,
+  wednesday int NOT NULL,
+  thursday int NOT NULL,
+  friday int NOT NULL,
+  saturday int NOT NULL,
+  sunday int NOT NULL,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  CONSTRAINT calendar_pkey PRIMARY KEY (service_id)
 );
 CREATE INDEX calendar_service_id ON calendar (service_id);
 
 CREATE TABLE exception_types (
-exception_type int PRIMARY KEY,
-description text
+  exception_type int PRIMARY KEY,
+  description text
 );
 
 CREATE TABLE calendar_dates (
-service_id text,
-date date NOT NULL,
-exception_type int REFERENCES exception_types(exception_type)
+  service_id text,
+  date date NOT NULL,
+  exception_type int REFERENCES exception_types(exception_type)
 );
 CREATE INDEX calendar_dates_dateidx ON calendar_dates (date);
 
 CREATE TABLE route_types (
-route_type int PRIMARY KEY,
-description text
+  route_type int PRIMARY KEY,
+  description text
 );
 
 CREATE TABLE routes (
-route_id text,
-route_short_name text DEFAULT '',
-route_long_name text DEFAULT '',
-route_desc text DEFAULT '',
-route_type int REFERENCES route_types(route_type),
-route_url text,
-route_color text,
-route_text_color text,
-CONSTRAINT routes_pkey PRIMARY KEY (route_id)
+  route_id text,
+  route_short_name text DEFAULT '',
+  route_long_name text DEFAULT '',
+  route_desc text DEFAULT '',
+  route_type int REFERENCES route_types(route_type),
+  route_url text,
+  route_color text,
+  route_text_color text,
+  CONSTRAINT routes_pkey PRIMARY KEY (route_id)
 );
 
 CREATE TABLE shapes (
-shape_id text NOT NULL,
-shape_pt_lat double precision NOT NULL,
-shape_pt_lon double precision NOT NULL,
-shape_pt_sequence int NOT NULL
+  shape_id text NOT NULL,
+  shape_pt_lat double precision NOT NULL,
+  shape_pt_lon double precision NOT NULL,
+  shape_pt_sequence int NOT NULL
 );
 CREATE INDEX shapes_shape_key ON shapes (shape_id);
 
 -- Create a table to store the shape geometries
 CREATE TABLE shape_geoms (
-shape_id text NOT NULL,
-shape_geom geometry('LINESTRING', 4326),
-CONSTRAINT shape_geom_pkey PRIMARY KEY (shape_id)
+  shape_id text NOT NULL,
+  shape_geom geometry('LINESTRING', 4326),
+  CONSTRAINT shape_geom_pkey PRIMARY KEY (shape_id)
 );
 CREATE INDEX shape_geoms_key ON shapes (shape_id);
 
 CREATE TABLE location_types (
-location_type int PRIMARY KEY,
-description text
+  location_type int PRIMARY KEY,
+  description text
 );
 
 CREATE TABLE stops (
-stop_id text,
-stop_code text,
-stop_name text DEFAULT NULL,
-stop_desc text DEFAULT NULL,
-stop_lat double precision,
-stop_lon double precision,
-zone_id text,
-stop_url text,
-location_type integer  REFERENCES location_types(location_type),
-parent_station integer,
-stop_geom geometry('POINT', 4326),
-platform_code text DEFAULT NULL,
-CONSTRAINT stops_pkey PRIMARY KEY (stop_id)
+  stop_id text,
+  stop_code text,
+  stop_name text DEFAULT NULL,
+  stop_desc text DEFAULT NULL,
+  stop_lat double precision,
+  stop_lon double precision,
+  zone_id text,
+  stop_url text,
+  location_type integer  REFERENCES location_types(location_type),
+  parent_station integer,
+  stop_geom geometry('POINT', 4326),
+  platform_code text DEFAULT NULL,
+  CONSTRAINT stops_pkey PRIMARY KEY (stop_id)
 );
 
 CREATE TABLE pickup_dropoff_types (
-type_id int PRIMARY KEY,
-description text
+  type_id int PRIMARY KEY,
+  description text
 );
 
 CREATE TABLE stop_times (
-trip_id text NOT NULL,
--- Check that casting to time interval works.
-arrival_time interval CHECK (arrival_time::interval = arrival_time::interval),
-departure_time interval CHECK (departure_time::interval = departure_time::interval),
-stop_id text,
-stop_sequence int NOT NULL,
-pickup_type int REFERENCES pickup_dropoff_types(type_id),
-drop_off_type int REFERENCES pickup_dropoff_types(type_id),
-CONSTRAINT stop_times_pkey PRIMARY KEY (trip_id, stop_sequence)
+  trip_id text NOT NULL,
+  -- Check that casting to time interval works.
+  arrival_time interval CHECK (arrival_time::interval = arrival_time::interval),
+  departure_time interval CHECK (departure_time::interval = departure_time::interval),
+  stop_id text,
+  stop_sequence int NOT NULL,
+  pickup_type int REFERENCES pickup_dropoff_types(type_id),
+  drop_off_type int REFERENCES pickup_dropoff_types(type_id),
+  CONSTRAINT stop_times_pkey PRIMARY KEY (trip_id, stop_sequence)
 );
 CREATE INDEX stop_times_key ON stop_times (trip_id, stop_id);
 CREATE INDEX arr_time_index ON stop_times (arrival_time);
 CREATE INDEX dep_time_index ON stop_times (departure_time);
 
 CREATE TABLE trips (
-route_id text NOT NULL,
-service_id text NOT NULL,
-trip_id text NOT NULL,
-trip_headsign text,
-direction_id int,
-block_id text,
-shape_id text,
-CONSTRAINT trips_pkey PRIMARY KEY (trip_id)
+  route_id text NOT NULL,
+  service_id text NOT NULL,
+  trip_id text NOT NULL,
+  trip_headsign text,
+  direction_id int,
+  block_id text,
+  shape_id text,
+  CONSTRAINT trips_pkey PRIMARY KEY (trip_id)
 );
 CREATE INDEX trips_trip_id ON trips (trip_id);
 
@@ -232,7 +232,7 @@ CSV HEADER;
 			<programlisting>
 INSERT INTO shape_geoms
 SELECT shape_id, ST_MakeLine(array_agg(
-ST_SetSRID(ST_MakePoint(shape_pt_lon, shape_pt_lat),4326) ORDER BY shape_pt_sequence))
+  ST_SetSRID(ST_MakePoint(shape_pt_lon, shape_pt_lat),4326) ORDER BY shape_pt_sequence))
 FROM shapes
 GROUP BY shape_id;
 
@@ -284,21 +284,21 @@ WHERE exception_type = 1 AND start_date &lt;= date AND date &lt;= end_date
 			<programlisting>
 DROP TABLE IF EXISTS trip_stops;
 CREATE TABLE trip_stops (
-trip_id text,
-stop_sequence integer,
-no_stops integer,
-route_id text,
-service_id text,
-shape_id text,
-stop_id text,
-arrival_time interval,
-perc float
+  trip_id text,
+  stop_sequence integer,
+  no_stops integer,
+  route_id text,
+  service_id text,
+  shape_id text,
+  stop_id text,
+  arrival_time interval,
+  perc float
 );
 
 INSERT INTO trip_stops (trip_id, stop_sequence, no_stops, route_id, service_id,
-shape_id, stop_id, arrival_time)
+  shape_id, stop_id, arrival_time)
 SELECT t.trip_id, stop_sequence, MAX(stop_sequence) OVER (PARTITION BY t.trip_id),
-route_id, service_id, shape_id, stop_id, arrival_time
+  route_id, service_id, shape_id, stop_id, arrival_time
 FROM trips t JOIN stop_times s ON t.trip_id = s.trip_id;
 
 UPDATE trip_stops t
@@ -318,31 +318,31 @@ WHERE t.shape_id = g.shape_id AND t.stop_id = s.stop_id;
 			<programlisting>
 DROP TABLE IF EXISTS trip_segs;
 CREATE TABLE trip_segs (
-trip_id text,
-route_id text,
-service_id text,
-stop1_sequence integer,
-stop2_sequence integer,
-no_stops integer,
-shape_id text,
-stop1_arrival_time interval,
-stop2_arrival_time interval,
-perc1 float,
-perc2 float,
-seg_geom geometry,
-seg_length float,
-no_points integer,
-PRIMARY KEY (trip_id, stop1_sequence)
+  trip_id text,
+  route_id text,
+  service_id text,
+  stop1_sequence integer,
+  stop2_sequence integer,
+  no_stops integer,
+  shape_id text,
+  stop1_arrival_time interval,
+  stop2_arrival_time interval,
+  perc1 float,
+  perc2 float,
+  seg_geom geometry,
+  seg_length float,
+  no_points integer,
+  PRIMARY KEY (trip_id, stop1_sequence)
 );
 
 INSERT INTO trip_segs (trip_id, route_id, service_id, stop1_sequence, stop2_sequence,
-no_stops, shape_id, stop1_arrival_time, stop2_arrival_time, perc1, perc2)
+  no_stops, shape_id, stop1_arrival_time, stop2_arrival_time, perc1, perc2)  
 WITH temp AS (
-SELECT trip_id, route_id, service_id, stop_sequence,
-	LEAD(stop_sequence) OVER w AS stop_sequence2,
-	MAX(stop_sequence) OVER (PARTITION BY trip_id),
-	shape_id, arrival_time, LEAD(arrival_time) OVER w, perc, LEAD(perc) OVER w
-FROM trip_stops WINDOW w AS (PARTITION BY trip_id ORDER BY stop_sequence)
+  SELECT trip_id, route_id, service_id, stop_sequence,
+    LEAD(stop_sequence) OVER w AS stop_sequence2,
+  MAX(stop_sequence) OVER (PARTITION BY trip_id),
+  shape_id, arrival_time, LEAD(arrival_time) OVER w, perc, LEAD(perc) OVER w
+  FROM trip_stops WINDOW w AS (PARTITION BY trip_id ORDER BY stop_sequence)
 )
 SELECT * FROM temp WHERE stop_sequence2 IS NOT null;
 
@@ -362,20 +362,20 @@ SET seg_length = ST_Length(seg_geom), no_points = ST_NumPoints(seg_geom);
 			<programlisting>
 DROP TABLE IF EXISTS trip_points;
 CREATE TABLE trip_points (
-trip_id text,
-route_id text,
-service_id text,
-stop1_sequence integer,
-point_sequence integer,
-point_geom geometry,
-point_arrival_time interval,
-PRIMARY KEY (trip_id, stop1_sequence, point_sequence)
+  trip_id text,
+  route_id text,
+  service_id text,
+  stop1_sequence integer,
+  point_sequence integer,
+  point_geom geometry,
+  point_arrival_time interval,
+  PRIMARY KEY (trip_id, stop1_sequence, point_sequence)
 );
 
 INSERT INTO trip_points (trip_id, route_id, service_id, stop1_sequence,
-point_sequence, point_geom, point_arrival_time)
+  point_sequence, point_geom, point_arrival_time)
 WITH temp1 AS (
-SELECT trip_id, route_id, service_id, stop1_sequence, stop2_sequence,
+  SELECT trip_id, route_id, service_id, stop1_sequence, stop2_sequence,
 	no_stops, stop1_arrival_time, stop2_arrival_time, seg_length,
 	(dp).path[1] AS point_sequence, no_points, (dp).geom as point_geom
 FROM trip_segs, ST_DumpPoints(seg_geom) AS dp
@@ -409,12 +409,12 @@ FROM temp3;
 			<programlisting>
 DROP TABLE IF EXISTS trips_input;
 CREATE TABLE trips_input (
-trip_id text,
-route_id text,
-service_id text,
-date date,
-point_geom geometry,
-t timestamptz
+  trip_id text,
+  route_id text,
+  service_id text,
+  date date,
+  point_geom geometry,
+  t timestamptz
 );
 
 INSERT INTO trips_input
@@ -431,22 +431,22 @@ ON t.service_id = s.service_id;
 			<programlisting>
 DROP TABLE IF EXISTS trips_mdb;
 CREATE TABLE trips_mdb (
-trip_id text NOT NULL,
-route_id text NOT NULL,
-date date NOT NULL,
-trip tgeompoint,
-PRIMARY KEY (trip_id, date)
+  trip_id text NOT NULL,
+  route_id text NOT NULL,
+  date date NOT NULL,
+  trip tgeompoint,
+  PRIMARY KEY (trip_id, date)
 );
 
 INSERT INTO trips_mdb(trip_id, route_id, date, trip)
-SELECT trip_id, route_id, date, tgeompointseq(array_agg(tgeompointinst(point_geom, t)
-ORDER BY T))
+SELECT trip_id, route_id, date,
+  tgeompoint_seq(array_agg(tgeompoint_inst(point_geom, t) ORDER BY T))
 FROM trips_input
 GROUP BY trip_id, route_id, date;
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
 SELECT trip_id, route_id, t.service_id, d.date,
-shift(trip, make_interval(days => d.date - t.date))
+  shift(trip, make_interval(days => d.date - t.date))
 FROM trips_mdb t JOIN service_dates d ON t.service_id = d.service_id AND t.date &lt;&gt; d.date;
 			</programlisting>
 			In the first <varname>INSERT</varname> statement we group the rows in the <varname>trips_input</varname> table by <varname>trip_id</varname> and <varname>date</varname> while keeping the <varname>route_id</varname> atribute, use the <varname>array_agg</varname> function to construct an array containing the temporal points composing the trip ordered by time, and compute the trip from this array using the function <varname>tgeompointseq</varname>. As explained above, table <varname>trips_input</varname> only contains the first date of a trip. In the second <varname>INSERT</varname> statement we add the trips for all the other dates with the function <varname>shift</varname>.

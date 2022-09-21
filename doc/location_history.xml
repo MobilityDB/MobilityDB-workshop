@@ -97,7 +97,7 @@ SET trajectory = trajectory(trip);
 
 		<figure id="location_history_fig" float="start"><title>Visualization of the Google location history loaded into MobilityDB.</title>
 			<mediaobject>
-				<imageobject><imagedata scalefit="1" fileref='images/location_history.png' /></imageobject>
+				<imageobject><imagedata scalefit="1" fileref='images/LocationHistory.png' /></imageobject>
 			</mediaobject>
 		</figure>
 

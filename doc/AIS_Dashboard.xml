@@ -118,7 +118,7 @@ sudo apt-get install -y software-properties-common wget
 wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
 
 # Add repository for stable releases
-echo &quot;deb https://packages.grafana.com/enterprise/deb stable main&quot; &amp;&amp;
+echo &quot;deb https://packages.grafana.com/enterprise/deb stable main&quot; 
   | sudo tee -a /etc/apt/sources.list.d/grafana.list
 
 # Install Grafana
@@ -217,7 +217,7 @@ sudo apt-get install grafana-enterprise
     <section xml:id="speed-of-individual-ships">
       <title>Speed of Individual Ships</title>
       <para>
-        Let’s visualize the speed of the ships using the previously
+        Let's visualize the speed of the ships using the previously
         built query. Here we will represent it as a statistic with a
         color gradient.
       </para>

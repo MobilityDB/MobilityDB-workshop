@@ -373,7 +373,7 @@ ORDER BY AzimuthDifference DESC;
 		<section>
 			<title>Analyzing the Trajectories</title>
 			<para>
-				Now we dive into MobilityDB and explore more of its functions. In <xref linkend="imgtrajFerry"/>, we notice trajectories that keep going between R&oslash;dby and Puttgarden. Most probably, these are the ferries between the two ports. The task is simply to spot which Ships do so, and to count how many one way trips they did in this day. This is expressed in the following query:
+				Now we dive into MobilityDB and explore more of its functions. In <xref linkend="imgtrajFerry"/>, we notice trajectories that keep going between R&oslash;dby and Puttgarden. Most probably, these are the ferries between the two ports. The task is simply to spot which ships do so, and to count how many one way trips they did in this day. This is expressed in the following query:
 			</para>
 			<para>
 				<programlisting language="sql" xml:space="preserve">
@@ -381,11 +381,10 @@ CREATE INDEX Ships_Trip_Idx ON Ships USING GiST(Trip);
 
 WITH Ports(Rodby, Puttgarden) AS (
   SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
-    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
-)
+    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832) )
 SELECT S.*, Rodby, Puttgarden
 FROM Ports P, Ships S
-WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden)
+WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden);
 -- Total query runtime: 462 msec
 -- 4 rows retrieved.
 </programlisting>
@@ -401,23 +400,23 @@ WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden)
 				</mediaobject>
 			</figure>
 			<para>
-				This query creates two envelope geometries that represent the locations of the two ports, then intersects them with the spatiotemporal trajectories of the ships. The <varname>intersects</varname> function checks whether a temporal point has ever intersects a geometry. To speed up the query, a spatiotemporal GiST index is first built on the <varname>Trip</varname> attribute. The query identified four Ships that commuted between the two ports, <xref linkend="imgtrajFerries"/>. To count how many one way trips each of them did, we extend the previous query as follows:
+				This query creates two envelope geometries that represent the locations of the two ports, then intersects them with the spatiotemporal trajectories of the ships. The <varname>eintersects</varname> function checks whether a temporal point ever intersects a geometry. To speed up the query, a spatiotemporal GiST index is first built on the <varname>Trip</varname> attribute. The query identified four Ships that commuted between the two ports, <xref linkend="imgtrajFerries"/>. To count how many one way trips each of them did, we extend the previous query as follows:
 				<programlisting language="sql" xml:space="preserve">
 WITH Ports(Rodby, Puttgarden) AS (
   SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
-    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
-)
+    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832) )
 SELECT MMSI, (numSequences(atGeometry(S.Trip, P.Rodby)) +
   numSequences(atGeometry(S.Trip, P.Puttgarden)))/2.0 AS NumTrips
 FROM Ports P, Ships S
-WHERE intersects(S.Trip, P.Rodby) AND intersects(S.Trip, P.Puttgarden)
--- Total query runtime: 1.1 secs
+WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden);
 
-MMSI		NumTrips
-219000429;  24.0
-211188000;  24.0
-211190000;  25.0
-219000431;  16.0
+   mmsi    |      numtrips
+-----------+---------------------
+ 211188000 | 22.0000000000000000
+ 211190000 | 22.0000000000000000
+ 219000429 | 24.0000000000000000
+ 219000431 | 24.0000000000000000
+(4 rows)
 </programlisting>
 			</para>
 			<para>
@@ -429,18 +428,15 @@ MMSI		NumTrips
 			<para>
 				<programlisting language="sql" xml:space="preserve">
 WITH B(Belt) AS (
-  SELECT ST_MakeEnvelope(640730, 6058230, 654100, 6042487, 25832)
-),
+  SELECT ST_MakeEnvelope(640730, 6058230, 654100, 6042487, 25832) ),
 BeltShips AS (
   SELECT MMSI, atGeometry(S.Trip, B.Belt) AS Trip,
     trajectory(atGeometry(S.Trip, B.Belt)) AS Traj
   FROM Ships S, B
-  WHERE intersects(S.Trip, B.Belt)
-)
+  WHERE eintersects(S.Trip, B.Belt) )
 SELECT S1.MMSI, S2.MMSI, S1.Traj, S2.Traj, shortestLine(S1.trip, S2.trip) Approach
 FROM BeltShips S1, BeltShips S2
-WHERE S1.MMSI > S2.MMSI AND
-dwithin(S1.trip, S2.trip, 300)
+WHERE S1.MMSI > S2.MMSI AND edwithin(S1.trip, S2.trip, 300);
 -- Total query runtime: 28.5 secs
 -- 7 rows retrieved.
 </programlisting>

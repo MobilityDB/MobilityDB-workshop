@@ -96,7 +96,7 @@
         <para>
            <ulink url="https://grafana.com/docs/grafana/latest/setup-grafana/installation/mac/">macOS</ulink>
         </para>
-        <programlisting>
+        <programlisting language="bash">
 brew update
 brew install grafana
 brew services start grafana

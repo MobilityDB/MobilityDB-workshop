@@ -34,7 +34,7 @@
 		</para>
 
 		<para>If we want to load location information into MobilityDB we only need the fields <varname>longitudeE7</varname>, <varname>latitudeE7</varname>, and <varname>timestampMs</varname>. To convert the original JSON file into a CSV file containing only these fields we can use <ulink url="https://stedolan.github.io/jq/">jq</ulink>, a command-line JSON processor. The following command
-			<programlisting>
+			<programlisting language="bash">
 cat location_history.json | jq -r ".locations[] | {latitudeE7, longitudeE7, timestampMs}
 | [.latitudeE7, .longitudeE7, .timestampMs] | @csv" > location_history.csv
 			</programlisting>
@@ -51,14 +51,16 @@ cat location_history.json | jq -r ".locations[] | {latitudeE7, longitudeE7, time
 			The above command works well for files of moderate size since by default jq loads the whole input text in memory. For very large files you may consider the <varname>--stream</varname> option of jq, which parses input texts in a streaming fashion.
 		</para>
 
-		<para>Now we can import the generated CSV file into PostgreSQL as follows.
-			<programlisting>
+		<para>Now we can import the generated CSV file into PostgreSQL as follows. If the <varname>COPY</varname> command throws a permission 
+		error, you can instead use the <varname>\copy</varname> command of <varname>psql</varname> to import the CSV file.
+			<programlisting language="sql">
 DROP TABLE IF EXISTS location_history;
+
 CREATE TABLE location_history (
-latitudeE7 float,
-longitudeE7 float,
-timestampMs bigint,
-date date
+	latitudeE7 float,
+	longitudeE7 float,
+	timestampMs bigint,
+	date date
 );
 
 COPY location_history(latitudeE7, longitudeE7, timestampMs) FROM
@@ -72,19 +74,20 @@ SET date = date(to_timestamp(timestampMs / 1000.0)::timestamptz);
 
 		<para>
 			We can now transform this data into MobilityDB trips as follows.
-			<programlisting>
+			<programlisting language="sql">
 DROP TABLE IF EXISTS locations_mdb;
+
 CREATE TABLE locations_mdb (
-date date NOT NULL,
-trip tgeompoint,
-trajectory geometry,
-PRIMARY KEY (date)
+	date date NOT NULL,
+	trip tgeompoint,
+	trajectory geometry,
+	PRIMARY KEY (date)
 );
 
 INSERT INTO locations_mdb(date, trip)
 SELECT date, tgeompoint_seq(array_agg(tgeompoint_inst(
-ST_SetSRID(ST_Point(longitudeE7/1e7, latitudeE7/1e7),4326),
-to_timestamp(timestampMs / 1000.0)::timestamptz) ORDER BY timestampMs))
+	ST_SetSRID(ST_Point(longitudeE7/1e7, latitudeE7/1e7),4326),
+	to_timestamp(timestampMs / 1000.0)::timestamptz) ORDER BY timestampMs))
 FROM location_history
 GROUP BY date;
 

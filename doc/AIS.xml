@@ -148,6 +148,13 @@ FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER
 </programlisting>
 			</para>
 			<para>
+				It is possible that the above command fails with a permission error. The reason for this is that <varname>COPY</varname> is a server capability, while the CSV file is on the client side. To overcome this issue, one can use the <varname>\copy</varname> command of <varname>psql</varname> as follows:
+				<programlisting language="bash" xml:space="preserve">
+psql -d DanishAIS -c "\copy AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus, ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length, TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType, SizeA, SizeB, SizeC, SizeD) FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER;"
+</programlisting>
+				In addition, if you downloaded the CSV file from <ulink url="https://github.com/MobilityDB/MobilityDB-workshop/tree/master/data">this repo's data</ulink> , then you will need to add the column 'geom' to the command.
+			</para>
+			<para>
 				This import took about 1 minute and 30 seconds on my machine, which is a development laptop. The CSV file has 11,809,593 rows, all of which were correctly imported. For bigger datasets, one could alternative could use the program <ulink url="https://github.com/dimitri/pgloader">pgloader</ulink>.
 			</para>
 			<para>
@@ -259,7 +266,7 @@ WITH buckets (bucketNo, RangeKM) AS (
   SELECT 7, floatspan '[1500, 10000)' ),
 histogram AS (
   SELECT bucketNo, RangeKM, count(MMSI) as freq
-  FROM buckets left outer join Ships on (length(Trip)/1000) &le;@ RangeKM
+  FROM buckets left outer join Ships on (length(Trip)/1000) &lt;@ RangeKM
   GROUP BY bucketNo, RangeKM
   ORDER BY bucketNo, RangeKM
 )

@@ -288,7 +288,7 @@ FROM histogram;
 </programlisting>
 			</para>
 			<para>
-				Surprisingly there are trips with zero length. These are clearly noise that can be deleted. Also there are very many short trips, that are less than 50 km long. On the other hand, there are few long trips that are more than 1,500 km long. Let's visualize these last two cases in <xref linkend="imgtrajsshort"/>. They look like noise. Normally one should validate more, but to simplify this module, we consider them as noise, and delete them.
+				Surprisingly there are trips with zero length. These are clearly noise that can be deleted. Also there are very many short trips, that are less than 50 km long. On the other hand, there are few long trips that are more than 1,500 km long. They look like noise. Normally one should validate more, but to simplify this module, we consider them as noise, and delete them.
 				<programlisting language="sql" xml:space="preserve">
 DELETE FROM Ships
 WHERE length(Trip) = 0 OR length(Trip) >= 1500000;
@@ -296,11 +296,6 @@ WHERE length(Trip) = 0 OR length(Trip) >= 1500000;
 </programlisting>
 				Now the <varname>Ships</varname> table looks like <xref linkend="imgtrajsfiltered"/>.
 			</para>
-			<figure id="imgtrajsshort" float="start"><title>Visualizing trips with abnormal lengths</title>
-				<mediaobject>
-					<imageobject><imagedata width='80%' fileref='images/trajsAbnormal.png'/></imageobject>
-				</mediaobject>
-			</figure>
 			<figure id="imgtrajsfiltered" float="start"><title>Ship trajectories after filtering</title>
 				<mediaobject>
 					<imageobject><imagedata width='80%' fileref='images/trajsFiltered.png'/></imageobject>

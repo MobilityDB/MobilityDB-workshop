@@ -1010,6 +1010,7 @@ ORDER BY twavg(velocity) desc;
                         <listitem>
                             <para>
                                 Title → Average Flight Speed
+                                Show → All values 
                             </para>
                         </listitem>
                     </itemizedlist>

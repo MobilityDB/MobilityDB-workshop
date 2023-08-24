@@ -74,6 +74,7 @@
       Connect to Data Source] section below.
     </para>
     <para>
+      Alternatively, you can set up your own MobilityDB database as described in the previous module.
       The raw data in CSV format is also available on the
        <ulink url="https://github.com/MobilityDB/MobilityDB-workshop/blob/master/data/ais_data.zip">MobilityDB-workshop
       repository</ulink>.
@@ -623,7 +624,7 @@ SELECT P.port_name,
        p.lng
 FROM ports AS P,
      Ships AS S
-WHERE intersects(S.Trip, P.port_geom)
+WHERE eintersects(S.Trip, P.port_geom)
 GROUP BY P.port_name, P.lat, P.lng
 </programlisting>
           <para>
@@ -719,7 +720,7 @@ WITH
   TimeShips AS (
     SELECT
       MMSI,
-      atPeriod(S.Trip, period '[2018-01-04 01:00:00, 2018-01-04 06:30:00)' ) AS trip
+      atTime(S.Trip, tstzspan '[2018-01-04 01:00:00, 2018-01-04 06:30:00)' ) AS trip
     FROM
       Ships S
 ),
@@ -738,7 +739,7 @@ WITH
       TimeShips S1, TimeShips S2
     WHERE
       S1.MMSI &gt; S2.MMSI AND
-      dwithin(S1.Trip, S2.Trip, 300)
+      edwithin(S1.Trip, S2.Trip, 300)
 )
 -- The final SELECT is used to project the time_at_closest_distance onto the sequence of
 -- locations to return the lat and long of both ships.
@@ -1015,7 +1016,7 @@ SELECT P.port_name,
       p.lat,
       p.lng
 FROM ports AS P, Ships AS S
-WHERE intersects(S.Trip, P.port_geom)
+WHERE eintersects(S.Trip, P.port_geom)
 GROUP BY P.port_name, P.lat, P.lng
 </programlisting>
       <para>
@@ -1024,12 +1025,12 @@ GROUP BY P.port_name, P.lat, P.lng
       </para>
       <programlisting language="sql">
 sum
-(numSequences(atGeometry( atPeriod(S.Trip, period '[$FromTime, $ToTime)'), P.port_geom)))
+(numSequences(atGeometry( atTime(S.Trip, tstzspan '[$FromTime, $ToTime)'), P.port_geom)))
     AS trips_intersect_with_port
 </programlisting>
       <para>
         Essentially we just wrapped <quote>S.Trip</quote> with
-        <quote>atPeriod()</quote> and passed our custom period range.
+        <quote>atTime()</quote> and passed our custom tstzspan range.
         The full query with this modification is below:
       </para>
       <programlisting language="sql" xml:space="preserve">
@@ -1045,13 +1046,13 @@ WITH ports(port_name, port_geom, lat, lng)
                     54.64, 11.36)) AS p(port_name, port_geom, lat, lng))
 
 SELECT P.port_name,
-       sum(numSequences(atGeometry(atPeriod(S.Trip, period '[$FromTime, $ToTime)'),
+       sum(numSequences(atGeometry(atTime(S.Trip, tstzspan '[$FromTime, $ToTime)'),
                                    P.port_geom))) AS trips_intersect_with_port,
        p.lat,
        p.lng
 FROM ports AS P,
      Ships AS S
-WHERE intersects(S.Trip, P.port_geom)
+WHERE eintersects(S.Trip, P.port_geom)
 GROUP BY P.port_name, P.lat, P.lng
 </programlisting>
       <para>

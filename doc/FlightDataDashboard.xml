@@ -1311,7 +1311,7 @@ AND geoaltitude IS NOT NULL;
                 </listitem>
                 <listitem>
             <para>
-                We will also add a manual override (top right of panel options, beside "All") to limit the minimum value of vertebrate. This will make all values
+                We will also add a manual override (top right of panel options, beside "All") to limit the minimum value of vertrate. This will make all values
                 below the minimum the same color, making larger values more obvious. This can be used to quickly
                 pinpoint locations where a large rate of ascent existed.
             </para>

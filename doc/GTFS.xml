@@ -54,14 +54,14 @@
 
 		<para>
 			We decompress the file with the data into a directory. This can be done using the command.
-			<programlisting>
+			<programlisting language="bash">
 unzip gtfs_data.zip
 			</programlisting>
 			We suppose in the following that the directory used is as follows <varname>/home/gtfs_tutorial/</varname>.
 		</para>
 
-		<para>We create the tables to be loaded with the data in the CSV files as follows.
-				<programlisting>
+		<para>First, you need to create a new database, <varname>gtfs</varname>, and issue the create extension command: <programlisting language="sql"> CREATE EXTENSION mobilityDB CASCADE;</programlisting>.  We then create the tables to be loaded with the data in the CSV files as follows.
+				<programlisting language="sql">
 CREATE TABLE agency (
   agency_id text DEFAULT '',
   agency_name text DEFAULT NULL,
@@ -204,8 +204,9 @@ INSERT INTO pickup_dropoff_types (type_id, description) VALUES
 		</para>
 
 		<para>
-			We can load the CSV files into the corresponding tables as follows.
-			<programlisting>
+			We can load the CSV files into the corresponding tables as follows. As in the previous examples, if you experience a permission
+      denied error, you can use the <varname>\copy</varname> command from the psql shell instead of the <varname>COPY</varname> command.
+			<programlisting language="sql">
 COPY calendar(service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,
 start_date,end_date) FROM '/home/gtfs_tutorial/calendar.txt' DELIMITER ',' CSV HEADER;
 COPY calendar_dates(service_id,date,exception_type)
@@ -229,7 +230,7 @@ location_type,parent_station) FROM '/home/gtfs_tutorial/stops.txt' DELIMITER ','
 CSV HEADER;
 			</programlisting>
 			Finally, we create the geometries for routes and stops as follows.
-			<programlisting>
+			<programlisting language="sql">
 INSERT INTO shape_geoms
 SELECT shape_id, ST_MakeLine(array_agg(
   ST_SetSRID(ST_MakePoint(shape_pt_lon, shape_pt_lat),4326) ORDER BY shape_pt_sequence))
@@ -253,7 +254,7 @@ SET stop_geom = ST_SetSRID(ST_MakePoint(stop_lon, stop_lat),4326);
 		<title>Transforming GTFS Data for MobilityDB</title>
 		<para>
 			We start by creating a table that contains couples of <varname>service_id</varname> and <varname>date</varname> defining the dates at which a  service is provided.
-			<programlisting>
+			<programlisting language="sql">
 DROP TABLE IF EXISTS service_dates;
 CREATE TABLE service_dates AS (
 SELECT service_id, date_trunc('day', d)::date AS date
@@ -281,7 +282,7 @@ WHERE exception_type = 1 AND start_date &lt;= date AND date &lt;= end_date
 
 		<para>
 			We now create a table <varname>trip_stops</varname> that determines the stops for each trip.
-			<programlisting>
+			<programlisting language="sql">
 DROP TABLE IF EXISTS trip_stops;
 CREATE TABLE trip_stops (
   trip_id text,
@@ -315,7 +316,7 @@ WHERE t.shape_id = g.shape_id AND t.stop_id = s.stop_id;
 
 		<para>
 			We now create a table <varname>trip_segs</varname> that defines the segments between two consecutive stops of a trip.
-			<programlisting>
+			<programlisting language="sql">
 DROP TABLE IF EXISTS trip_segs;
 CREATE TABLE trip_segs (
   trip_id text,
@@ -359,7 +360,7 @@ SET seg_length = ST_Length(seg_geom), no_points = ST_NumPoints(seg_geom);
 
 		<para>
 			The geometry of a segment is a linestring containing multiple points. From the previous table we know at which time the trip arrived at the first point and at the last point of the segment. To determine at which time the trip arrived at the intermediate points of the segments, we create a table <varname>trip_points</varname> that contains all the points composing the geometry of a segment.
-			<programlisting>
+			<programlisting language="sql">
 DROP TABLE IF EXISTS trip_points;
 CREATE TABLE trip_points (
   trip_id text,
@@ -406,7 +407,7 @@ FROM temp3;
 
 		<para>
 			Our last temporary table <varname>trips_input</varname> contains the data in the format that can be used for creating the MobilityDB trips.
-			<programlisting>
+			<programlisting language="sql">
 DROP TABLE IF EXISTS trips_input;
 CREATE TABLE trips_input (
   trip_id text,
@@ -428,21 +429,21 @@ ON t.service_id = s.service_id;
 
 		<para>
 			Finally, table <varname>trips_mdb</varname> contains the MobilityDB trips.
-			<programlisting>
+			<programlisting language="sql">
 DROP TABLE IF EXISTS trips_mdb;
 CREATE TABLE trips_mdb (
-  trip_id text NOT NULL,
-  route_id text NOT NULL,
-  date date NOT NULL,
-  trip tgeompoint,
-  PRIMARY KEY (trip_id, date)
+	trip_id text NOT NULL,
+	service_id text NOT NULL,
+	route_id text NOT NULL,
+	date date NOT NULL,
+	trip tgeompoint,
+	PRIMARY KEY (trip_id, date)
 );
 
-INSERT INTO trips_mdb(trip_id, route_id, date, trip)
-SELECT trip_id, route_id, date,
-  tgeompoint_seq(array_agg(tgeompoint_inst(point_geom, t) ORDER BY T))
+INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
+SELECT trip_id, service_id, route_id, date, tgeompoint_seq(array_agg(tgeompoint_inst(point_geom, t) ORDER BY T))
 FROM trips_input
-GROUP BY trip_id, route_id, date;
+GROUP BY trip_id, service_id, route_id, date;
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
 SELECT trip_id, route_id, t.service_id, d.date,

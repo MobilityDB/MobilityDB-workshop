@@ -32,6 +32,32 @@
 			</affiliation>
 		</author>
 
+		<author>
+			<firstname>Mohammad Ismail</firstname>
+			<surname>Tirmizi</surname>
+			<affiliation>
+				<orgname>Universit&eacute; libre de Bruxelles, Belgium</orgname>
+			</affiliation>
+		</author>
+
+		<author>
+			<firstname>Adam</firstname>
+			<surname>Broniewski</surname>
+			<affiliation>
+				<orgname>Universit&eacute; libre de Bruxelles, Belgium</orgname>
+			</affiliation>
+		</author>
+
+		<othercredit>
+			<firstname>Jose Antonio</firstname>
+			<surname>Lorencio Abril</surname>
+			<affiliation>
+				<orgname>Universit&eacute; libre de Bruxelles, Belgium</orgname>
+			</affiliation>
+			<contrib>Update contents to MobilityDB 1.1.
+			</contrib>
+		</othercredit>
+
 		<abstract>
 			<para>
 				Every module in this workshop illustrates a usage scenario of MobilityDB. The data sets and the tools are described inside each of the modules. Eventually, additional modules will be added to discover more MobilityDB features.

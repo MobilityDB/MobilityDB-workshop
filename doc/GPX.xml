@@ -53,7 +53,7 @@ creator="Example creator"&gt;
 
 		<para>
 			The following Python program called <varname>gpx_to_csv.py</varname> uses <varname>expat</varname>, a stream-oriented XML parser library, to convert the above GPX file in CSV format.
-			<programlisting>
+			<programlisting language="python">
 import sys
 import xml.parsers.expat
 
@@ -84,7 +84,7 @@ p.ParseFile(sys.stdin.buffer)
 
 		<para>
 			This Python program can be executed as follows.
-			<programlisting>
+			<programlisting language="bash">
 python3 gpx_to_csv.py &lt; example.gpx &gt; example.csv
 			</programlisting>
 			The resulting CSV file is given next.
@@ -96,8 +96,8 @@ lon,lat,time
 31.461996,30.039801,2015-02-09T08:10:58.00Z
 ...
 			</programlisting>
-			The above CSV file can be loaded into MobilityDB as follows.
-			<programlisting>
+			The above CSV file can be loaded into MobilityDB as follows. If the command <varname>COPY</varname> throws a permission error, you can instead use the <varname>\copy</varname> command of <varname>psql</varname> to import the CSV file.
+			<programlisting language="sql">
 DROP TABLE IF EXISTS trips_input;
 CREATE TABLE trips_input (
 	date date,

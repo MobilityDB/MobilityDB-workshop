@@ -36,7 +36,7 @@
 		<section>
 			<title>Data</title>
 			<para>
-				The Danish Maritime Authority publishes about 3 TB of AIS routes in CSV format <ulink url="https://www.dma.dk/SikkerhedTilSoes/Sejladsinformation/AIS/Sider/default.aspx">here</ulink>. The columns in the CSV are listed in <xref linkend="tabdata"/>. This module uses the data of one day April 1<superscript>st</superscript> 2018. The CSV file size is 1.9 GB, and it contains about 10 M rows.
+				The Danish Maritime Authority publishes about 3 TB of AIS routes in CSV format <ulink url="https://web.ais.dk/aisdata/">here</ulink>. The columns in the CSV are listed in <xref linkend="tabdata"/>. This module uses the data of one day June 1<superscript>st</superscript> 2023. The CSV file size is 582 MB, and it contains more than 11 M rows.
 			</para>
 
 			<table pgwide='1' width='100%' id='tabdata' frame='all'><title>AIS columns</title>
@@ -81,7 +81,7 @@
 				The tools used in this module are as follows:
 				<itemizedlist>
 					<listitem>
-						<para>MobilityDB, on top of PostgreSQL and PostGIS. Here I use the MobilityDB <ulink url="https://github.com/ULB-CoDE-WIT/MobilityDB"> docker image</ulink>. </para>
+						<para>MobilityDB, on top of PostgreSQL and PostGIS. Although you can use a docker image, we recommend to install <ulink url="https://github.com/MobilityDB/MobilityDB">MobilityDB</ulink> on your system, either from binaries or from sources.</para>
 					</listitem>
 					<listitem>
 						<para>QGIS</para>
@@ -144,11 +144,18 @@ COPY AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus,
   ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length,
   TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType,
   SizeA, SizeB, SizeC, SizeD)
-FROM '/home/mobilitydb/DanishAIS/aisdk_20180401.csv' DELIMITER  ',' CSV HEADER;
+FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER;
 </programlisting>
 			</para>
 			<para>
-				This import took about 3 minutes on my machine, which is an average laptop. The CSV file has 10,619,212 rows, all of which were correctly imported. For bigger datasets, one could alternative could use the program <ulink url="https://github.com/dimitri/pgloader">pgloader</ulink>.
+				It is possible that the above command fails with a permission error. The reason for this is that <varname>COPY</varname> is a server capability, while the CSV file is on the client side. To overcome this issue, one can use the <varname>\copy</varname> command of <varname>psql</varname> as follows:
+				<programlisting language="bash" xml:space="preserve">
+psql -d DanishAIS -c "\copy AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus, ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length, TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType, SizeA, SizeB, SizeC, SizeD) FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER;"
+</programlisting>
+				In addition, if you downloaded the CSV file from <ulink url="https://github.com/MobilityDB/MobilityDB-workshop/tree/master/data">this repo's data</ulink> , then you will need to add the column 'geom' to the command.
+			</para>
+			<para>
+				This import took about 1 minute and 30 seconds on my machine, which is a development laptop. The CSV file has 11,809,593 rows, all of which were correctly imported. For bigger datasets, one could alternative could use the program <ulink url="https://github.com/dimitri/pgloader">pgloader</ulink>.
 			</para>
 			<para>
 				We clean up some of the fields in the table and create spatial points with the following command.
@@ -163,7 +170,7 @@ UPDATE AISInput SET
 </programlisting>
 			</para>
 			<para>
-				This took about 5 minutes on my machine. Let's visualize the spatial points on QGIS.
+				The above query took around 1.5 min on my desktop. Let's visualize the spatial points on QGIS.
 			</para>
 			<figure id="imgpoints" float="start"><title>Visualizing the input points</title>
 				<mediaobject>
@@ -187,9 +194,9 @@ CREATE TABLE AISInputFiltered AS
 SELECT DISTINCT ON(MMSI, T) *
 FROM AISInput
 WHERE Longitude BETWEEN -16.1 AND 32.88 AND Latitude BETWEEN 40.18 AND 84.17;
--- Query returned successfully: 10357703 rows affected, 01:14 minutes execution time.
+-- Query returned successfully: 11545496 rows affected, 00:45 minutes execution time.
 SELECT COUNT(*) FROM AISInputFiltered;
---10357703
+--11545496
 </programlisting>
 			</para>
 		</section>
@@ -201,25 +208,28 @@ SELECT COUNT(*) FROM AISInputFiltered;
 			</para>
 			<para>
 				<programlisting language="sql" xml:space="preserve">
-CREATE TABLE Ships(MMSI, Trip, SOG, COG) AS
-SELECT MMSI,
-  tgeompoint_contseq(array_agg(tgeompoint(ST_Transform(Geom, 25832), T) ORDER BY T)),
-  tfloat_contseq(array_agg(tfloat(SOG, T) ORDER BY T) FILTER (WHERE SOG IS NOT NULL)),
-  tfloat_contseq(array_agg(tfloat(COG, T) ORDER BY T) FILTER (WHERE COG IS NOT NULL))
-FROM AISInputFiltered
+CREATE TABLE Ships(MMSI, Trip, SOG, COG) AS 
+SELECT MMSI, 
+  tgeompoint_seq(array_agg(tgeompoint_inst(ST_Transform(Geom, 25832), T) ORDER BY T)), 
+  tfloat_seq(array_agg(tfloat_inst(SOG, T) ORDER BY T) FILTER (WHERE SOG IS NOT NULL)), 
+  tfloat_seq(array_agg(tfloat_inst(COG, T) ORDER BY T) FILTER (WHERE COG IS NOT NULL)) 
+FROM AISInputFiltered 
 GROUP BY MMSI;
--- Query returned successfully: 2995 rows affected, 01:16 minutes execution time.
+-- Query returned successfully: 6264 rows affected, 00:52 minutes execution time.
 </programlisting>
 			</para>
 			<para>
-				This query constructs, per ship, its spatiotemporal trajectory <varname>Trip</varname>, and two temporal attributes <varname>SOG</varname> and <varname>COG</varname>. <varname>Trip</varname> is a temporal geometry point, and both <varname>SOG</varname> and <varname>COG</varname> are temporal floats. MobilityDB builds on the coordinate transformation feature of PostGIS. Here the SRID 25832 (European Terrestrial Reference System 1989) is used, because it is the one advised by Danish Maritime Authority in the download page of this dataset. Now, let's visualize the constructed trajectories in QGIS.
+				This query constructs, per ship, its spatiotemporal trajectory <varname>Trip</varname>, and two temporal attributes <varname>SOG</varname> and <varname>COG</varname>. <varname>Trip</varname> is a temporal geometry point, and both <varname>SOG</varname> and <varname>COG</varname> are temporal floats. MobilityDB builds on the coordinate transformation feature of PostGIS. Here the SRID 25832 (European Terrestrial Reference System 1989) is used, because it is the one advised by Danish Maritime Authority in the download page of this dataset. <xref linkend="imgtrajs" /> shows the constructed trajectories in QGIS. 
 			</para>
 			<para>
 				<programlisting language="sql" xml:space="preserve">
 ALTER TABLE Ships ADD COLUMN Traj geometry;
 UPDATE Ships SET Traj = trajectory(Trip);
--- Query returned successfully: 2995 rows affected, 3.8 secs execution time.
+-- Query returned successfully: 6264 rows affected, 3.8 secs execution time.
 </programlisting>
+			</para>
+			<para>
+				<xref linkend="imgtrajs" /> shows the constructed trajectories in QGIS. Notice that there are still significant errors in the data, in particular the vertical lines. These errors need to be corrected so that the analytical queries in the following sections return more accurate results. We do not cope with this issue here, since the topic of trajectory cleaning is beyond the scope of this introductory workshop.
 			</para>
 			<para>
 				<figure id="imgtrajs" float="start"><title>Visualizing the ship trajectories</title>
@@ -238,7 +248,7 @@ UPDATE Ships SET Traj = trajectory(Trip);
 			<para>
 				<programlisting language="sql" xml:space="preserve">
 SELECT SUM(length(Trip)) FROM Ships;
--- 500433519.121321
+-- 807319558.5805709
 </programlisting>
 			</para>
 			<para>
@@ -247,48 +257,45 @@ SELECT SUM(length(Trip)) FROM Ships;
 			<para>
 				<programlisting language="sql" xml:space="preserve">
 WITH buckets (bucketNo, RangeKM) AS (
-  SELECT 1, floatrange '[0, 0]' UNION
-  SELECT 2, floatrange '(0, 50)' UNION
-  SELECT 3, floatrange '[50, 100)' UNION
-  SELECT 4, floatrange '[100, 200)' UNION
-  SELECT 5, floatrange '[200, 500)' UNION
-  SELECT 6, floatrange '[500, 1500)' UNION
-  SELECT 7, floatrange '[1500, 10000)' ),
+  SELECT 1, floatspan '[0, 0]' UNION
+  SELECT 2, floatspan '(0, 50)' UNION
+  SELECT 3, floatspan '[50, 100)' UNION
+  SELECT 4, floatspan '[100, 200)' UNION
+  SELECT 5, floatspan '[200, 500)' UNION
+  SELECT 6, floatspan '[500, 1500)' UNION
+  SELECT 7, floatspan '[1500, 10000)' ),
 histogram AS (
   SELECT bucketNo, RangeKM, count(MMSI) as freq
-  FROM buckets left outer join Ships on (length(Trip)/1000) &#x003C;&commat; RangeKM
+  FROM buckets left outer join Ships on (length(Trip)/1000) &lt;@ RangeKM
   GROUP BY bucketNo, RangeKM
   ORDER BY bucketNo, RangeKM
 )
 SELECT bucketNo, RangeKM, freq,
-  repeat('&#x25AA;', ( freq::float / max(freq) OVER () * 30 )::int ) AS bar
+  repeat('&#x25AA;', ( freq::float / max(freq) OVER () * 30 )::int ) AS bar 
 FROM histogram;
--- Total query runtime: 5.6 secs
+-- Total query runtime: 2.8 secs
 
-bucketNo,   bucketRange,        freq	   bar
-1;          "[0,0]";            303;       &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
-2;          "(0,50)";           1693;      &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
-3;          "[50,100)";         267;       &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
-4;          "[100,200)";        276;       &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
-5;          "[200,500)";        361;       &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
-6;          "[500,1500)";       86;        &#x25AA;&#x25AA;
-7;          "[1500,10000)";     6;
+ bucketno |    rangekm    | freq |              bar
+----------+---------------+------+--------------------------------
+        1 | [0, 0]        |  796 | &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
+        2 | (0, 50)       | 3752 | &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
+        3 | [50, 100)     |  571 | &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
+        4 | [100, 200)    |  452 | &#x25AA;&#x25AA;&#x25AA;&#x25AA;
+        5 | [200, 500)    |  569 | &#x25AA;&#x25AA;&#x25AA;&#x25AA;&#x25AA;
+        6 | [500, 1500)   |  100 | &#x25AA;
+        7 | [1500, 10000) |   22 |
+(7 rows)
 </programlisting>
 			</para>
 			<para>
-				Surprisingly there are trips with zero length. These are clearly noise that can be deleted. Also there are very many short trips, that are less than 50 km long. On the other hand, there are few long trips that are more than 1,500 km long. Let's visualize these last two cases in <xref linkend="imgtrajsshort"/>. They look like noise. Normally one should validate more, but to simplify this module, we consider them as noise, and delete them.
+				Surprisingly there are trips with zero length. These are clearly noise that can be deleted. Also there are very many short trips, that are less than 50 km long. On the other hand, there are few long trips that are more than 1,500 km long. They look like noise. Normally one should validate more, but to simplify this module, we consider them as noise, and delete them.
 				<programlisting language="sql" xml:space="preserve">
 DELETE FROM Ships
 WHERE length(Trip) = 0 OR length(Trip) >= 1500000;
--- Query returned successfully in 7 secs 304 msec.
+-- DELETE 820
 </programlisting>
 				Now the <varname>Ships</varname> table looks like <xref linkend="imgtrajsfiltered"/>.
 			</para>
-			<figure id="imgtrajsshort" float="start"><title>Visualizing trips with abnormal lengths</title>
-				<mediaobject>
-					<imageobject><imagedata width='80%' fileref='images/trajsShort.png'/></imageobject>
-				</mediaobject>
-			</figure>
 			<figure id="imgtrajsfiltered" float="start"><title>Ship trajectories after filtering</title>
 				<mediaobject>
 					<imageobject><imagedata width='80%' fileref='images/trajsFiltered.png'/></imageobject>
@@ -298,39 +305,22 @@ WHERE length(Trip) = 0 OR length(Trip) >= 1500000;
 				Let's have a look at the speed of the ships. There are two speed values in the data; the speed calculated from the spatiotemporal trajectory <varname>speed(Trip)</varname>, and the <varname>SOG</varname> attribute. Optimally, the two will be the same. A small variance would still be OK, because of sensor errors. Note that both are temporal floats. In the next query, we compare the averages of the two speed values for every ship:
 				<programlisting language="sql" xml:space="preserve">
 SELECT ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) SpeedDifference
-FROM Ships
+FROM Ships WHERE SOG IS NOT NULL AND
+  ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) > 10.0
 ORDER BY SpeedDifference DESC;
--- Total query runtime: 8.2 secs
--- 990 rows retrieved.
 
-SpeedDifference
-NULL
-NULL
-NULL
-NULL
-NULL
-107.861100067879
-57.1590253627668
-42.4207839833568
-39.5819188407125
-33.6182789410313
-30.9078594633161
-26.514042447366
-22.1312646226031
-20.5389022294181
-19.8500569368283
-19.4134688682774
-18.180139457754
-17.4859077178001
-17.3155991287105
-17.1739822139821
-12.9571603234404
-12.6195380496344
-12.2714437568609
-10.9619033557275
-10.4164745930929
-10.3306155308426
-9.46457823214455
+  speeddifference
+-------------------
+ 241.42049907716665
+ 134.61257387558112
+ 112.36643046964278
+ 110.10490793777619
+  81.66118732332465
+   81.5725669336415
+  69.85832834619002
+ 57.232404771295045
+ 52.943341619001586
+ 52.921746684116904
 ...
 </programlisting>
 			</para>
@@ -338,7 +328,11 @@ NULL
 				The <varname>twavg</varname> computes a time-weighted average of a temporal float. It basically computes the area under the curve, then divides it by the time duration of the temporal float. By doing so, the speed values that remain for longer durations affect the average more than those that remain for shorter durations. Note that SOG is in knot, and Speed(Trip) is in m/s. The query converts both to km/h.
 			</para>
 			<para>
-				The query shows that 26 out of the 990 ship trajectories in the table have a difference of more than 10 km/h or NULL. These trajectories are shown in <xref linkend="imgtrajsWrongSpeed"/>. Again they look like noise, so we remove them.
+				The query shows the first 10 ship trajectories of the 82 in the table that have a difference of more than 10 km/h. These trajectories are shown in <xref linkend="imgtrajsWrongSpeed"/>. Again they look like noise, so we remove them with the following query
+				<programlisting language="sql" xml:space="preserve">
+DELETE FROM Ships 
+WHERE ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) > 10;
+</programlisting>
 			</para>
 			<figure id="imgtrajsWrongSpeed" float="start"><title>Ship trajectories with big difference between <varname>speed(Trip)</varname> and <varname>SOG</varname></title>
 				<mediaobject>
@@ -348,35 +342,28 @@ NULL
 			<para>
 				Now we do a similar comparison between the calculated azimuth from the spatiotemporal trajectory, and the attribute COG:
 				<programlisting language="sql" xml:space="preserve">
-SELECT ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi() ) AzimuthDifference
-FROM Ships
+SELECT ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) AzimuthDifference 
+FROM Ships 
+WHERE ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) > 45.0 
 ORDER BY AzimuthDifference DESC;
--- Total query runtime: 4.0 secs
--- 964 rows retrieved.
 
-264.838740787458
-220.958372832234
-180.867071483688
-178.774337481463
-154.239639388087
-139.633953692907
-137.347542674865
-128.239459879571
-121.107566199195
-119.843262642657
-116.685117326047
-116.010477588934
-109.830338231363
-106.94301191915
-106.890186229337
-106.55297972109
-103.20192549283
-102.585009756697
+ azimuthdifference
+--------------------
+  355.4200584570843
+   348.213417943632
+  333.7458943572906
+  321.5644829906112
+  309.6935360677792
+  308.4444213637132
+  295.5019204058323
+  294.7215887580075
+  267.8656764337898
+ 267.09343294055583
 ...
 </programlisting>
 			</para>
 			<para>
-				Here we see that the COG is not as accurate as the SOG attribute. More than 100 trajectories have an azimuth difference bigger than 45 degrees. <xref linkend="imgtrajsWrongAzimuth"/> visualizes them. Some of them look like noise, but some look fine. For simplicity, we keep them all.
+				Here we see that the COG is not as accurate as was the case for the SOG attribute. More than 1600 trajectories have an azimuth difference bigger than 45 degrees. <xref linkend="imgtrajsWrongAzimuth"/> visualizes them. Some of them look like noise, but some look fine. For simplicity, we keep them all.
 			</para>
 			<figure id="imgtrajsWrongAzimuth" float="start"><title>Ship trajectories with big difference between <varname>azimuth(Trip)</varname> and <varname>COG</varname></title>
 				<mediaobject>
@@ -388,7 +375,7 @@ ORDER BY AzimuthDifference DESC;
 		<section>
 			<title>Analyzing the Trajectories</title>
 			<para>
-				Now we dive into MobilityDB and explore more of its functions. In <xref linkend="imgtrajFerry"/>, we notice trajectories that keep going between R&oslash;dby and Puttgarden. Most probably, these are the ferries between the two ports. The task is simply to spot which Ships do so, and to count how many one way trips they did in this day. This is expressed in the following query:
+				Now we dive into MobilityDB and explore more of its functions. In <xref linkend="imgtrajFerry"/>, we notice trajectories that keep going between R&oslash;dby and Puttgarden. Most probably, these are the ferries between the two ports. The task is simply to spot which ships do so, and to count how many one way trips they did in this day. This is expressed in the following query:
 			</para>
 			<para>
 				<programlisting language="sql" xml:space="preserve">
@@ -396,11 +383,10 @@ CREATE INDEX Ships_Trip_Idx ON Ships USING GiST(Trip);
 
 WITH Ports(Rodby, Puttgarden) AS (
   SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
-    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
-)
+    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832) )
 SELECT S.*, Rodby, Puttgarden
 FROM Ports P, Ships S
-WHERE intersects(S.Trip, P.Rodby) AND intersects(S.Trip, P.Puttgarden)
+WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden);
 -- Total query runtime: 462 msec
 -- 4 rows retrieved.
 </programlisting>
@@ -416,23 +402,23 @@ WHERE intersects(S.Trip, P.Rodby) AND intersects(S.Trip, P.Puttgarden)
 				</mediaobject>
 			</figure>
 			<para>
-				This query creates two envelope geometries that represent the locations of the two ports, then intersects them with the spatiotemporal trajectories of the ships. The <varname>intersects</varname> function checks whether a temporal point has ever intersects a geometry. To speed up the query, a spatiotemporal GiST index is first built on the <varname>Trip</varname> attribute. The query identified four Ships that commuted between the two ports, <xref linkend="imgtrajFerries"/>. To count how many one way trips each of them did, we extend the previous query as follows:
+				This query creates two envelope geometries that represent the locations of the two ports, then intersects them with the spatiotemporal trajectories of the ships. The <varname>eintersects</varname> function checks whether a temporal point ever intersects a geometry. To speed up the query, a spatiotemporal GiST index is first built on the <varname>Trip</varname> attribute. The query identified four Ships that commuted between the two ports, <xref linkend="imgtrajFerries"/>. To count how many one way trips each of them did, we extend the previous query as follows:
 				<programlisting language="sql" xml:space="preserve">
 WITH Ports(Rodby, Puttgarden) AS (
   SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
-    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)
-)
+    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832) )
 SELECT MMSI, (numSequences(atGeometry(S.Trip, P.Rodby)) +
   numSequences(atGeometry(S.Trip, P.Puttgarden)))/2.0 AS NumTrips
 FROM Ports P, Ships S
-WHERE intersects(S.Trip, P.Rodby) AND intersects(S.Trip, P.Puttgarden)
--- Total query runtime: 1.1 secs
+WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden);
 
-MMSI		NumTrips
-219000429;  24.0
-211188000;  24.0
-211190000;  25.0
-219000431;  16.0
+   mmsi    |      numtrips
+-----------+---------------------
+ 211188000 | 22.0000000000000000
+ 211190000 | 22.0000000000000000
+ 219000429 | 24.0000000000000000
+ 219000431 | 24.0000000000000000
+(4 rows)
 </programlisting>
 			</para>
 			<para>
@@ -444,18 +430,15 @@ MMSI		NumTrips
 			<para>
 				<programlisting language="sql" xml:space="preserve">
 WITH B(Belt) AS (
-  SELECT ST_MakeEnvelope(640730, 6058230, 654100, 6042487, 25832)
-),
+  SELECT ST_MakeEnvelope(640730, 6058230, 654100, 6042487, 25832) ),
 BeltShips AS (
   SELECT MMSI, atGeometry(S.Trip, B.Belt) AS Trip,
     trajectory(atGeometry(S.Trip, B.Belt)) AS Traj
   FROM Ships S, B
-  WHERE intersects(S.Trip, B.Belt)
-)
+  WHERE eintersects(S.Trip, B.Belt) )
 SELECT S1.MMSI, S2.MMSI, S1.Traj, S2.Traj, shortestLine(S1.trip, S2.trip) Approach
 FROM BeltShips S1, BeltShips S2
-WHERE S1.MMSI > S2.MMSI AND
-dwithin(S1.trip, S2.trip, 300)
+WHERE S1.MMSI > S2.MMSI AND edwithin(S1.trip, S2.trip, 300);
 -- Total query runtime: 28.5 secs
 -- 7 rows retrieved.
 </programlisting>

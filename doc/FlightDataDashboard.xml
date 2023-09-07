@@ -96,9 +96,9 @@
     <section>
         <title>Preparing the Database</title>
         <para>
-            <ulink url="https://opensky-network.org/datasets/states/2020-06-01/">Dataset
+            The opensky data can be found in this <ulink url="https://opensky-network.org/datasets/states/2020-06-01/">Dataset
                 link
-            </ulink>
+            </ulink>.
         </para>
         <para>
             Create a new database <quote>opensky</quote>, then use your SQL
@@ -137,7 +137,9 @@ CREATE TABLE flights(
     <para>
       Load the data into the database using the following command.
       Replace the <literal>&lt;path_to_file&gt;</literal> with the
-      actual path of the CSV file. Do this for all files.
+      actual path of the CSV file. Do this for all files. As before, if this command
+      throws a permission error, you can use the <varname>\copy</varname> command
+      from the <varname>psql</varname> shell.
     </para>
     <programlisting language="sql">
 COPY flights(et, icao24, lat, lon, velocity, heading,
@@ -923,26 +925,25 @@ CREATE TABLE flight_traj(icao24, callsign, flight_period, trip, velocity, headin
 AS
     -- callsign sequence unpacked into rows to split all other temporal sequences.
 WITH airframe_traj_with_unpacked_callsign AS
-         (SELECT icao24,
-                 trip,
-                 velocity,
-                 heading,
-                 vertrate,
-                 squawk,
-                 geoaltitude,
-                 startValue(unnest(segments(callsign))) AS start_value_callsign,
-                 unnest(segments(callsign))::period     AS callsign_segment_period
-          FROM airframe_traj)
-
-SELECT icao24                                         AS icao24,
-       start_value_callsign                           AS callsign,
-       callsign_segment_period                        AS flight_period,
-       atPeriod(trip, callsign_segment_period)        AS trip,
-       atPeriod(velocity, callsign_segment_period)    AS velocity,
-       atPeriod(heading, callsign_segment_period)     AS heading,
-       atPeriod(vertrate, callsign_segment_period)    AS vertrate,
-       atPeriod(squawk, callsign_segment_period)      AS squawk,
-       atPeriod(geoaltitude, callsign_segment_period) AS geoaltitude
+	(SELECT icao24, 
+            trip, 
+            velocity, 
+            heading, 
+            vertrate, 
+            squawk, 
+            geoaltitude, 
+            startValue(unnest(segments(callsign))) AS start_value_callsign,
+		    unnest(segments(callsign))::tstzspan AS callsign_segment_period
+	FROM airframe_traj)
+SELECT icao24 AS icao24, 
+        start_value_callsign AS callsign, 
+        callsign_segment_period AS flight_period, 
+        atTime(trip, callsign_segment_period) AS trip, 
+        atTime(velocity, callsign_segment_period) AS velocity, 
+        atTime(heading, callsign_segment_period) AS heading, 
+        atTime(vertrate, callsign_segment_period) AS vertrate, 
+        atTime(squawk, callsign_segment_period) AS squawk, 
+        atTime(geoaltitude, callsign_segment_period) AS geoaltitude
 FROM airframe_traj_with_unpacked_callsign;
             </programlisting>
             <para>
@@ -1009,6 +1010,7 @@ ORDER BY twavg(velocity) desc;
                         <listitem>
                             <para>
                                 Title → Average Flight Speed
+                                Show → All values 
                             </para>
                         </listitem>
                     </itemizedlist>
@@ -1167,52 +1169,41 @@ WITH
 -- The flight_traj_time_slice CTE is clipping all the temporal columns
 -- to the user specified time-range.
 flight_traj_time_slice (icao24, callsign, time_slice_trip, time_slice_geoaltitude,
-                        time_slice_vertrate) AS
-    (SELECT icao24,
-            callsign,
-            atPeriod(trip, period '[2020-06-01 03:00:00, 2020-06-01 20:30:00)'),
-            atPeriod(geoaltitude, period '[2020-06-01 03:00:00, 2020-06-01 20:30:00)'),
-            atPeriod(vertrate,
-                     period '[2020-06-01 03:00:00, 2020-06-01 20:30:00)')
-     FROM flight_traj_sample TABLESAMPLE SYSTEM (20)),
-
+time_slice_vertrate) AS
+	(SELECT icao24, callsign,
+		atTime(trip, tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)'), -- I changed the dates to fit my data, you should do the same!!
+		atTime(geoaltitude, tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)'),
+		atTime(vertrate, tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)')
+	FROM flight_traj_sample TABLESAMPLE SYSTEM (20)),
 -- There are 3 things happening in the flight_traj_time_slice_ascent CTE:
 -- 1. atRange: Clips the temporal data to create ranges where the vertrate
---  was between '[1, 20]'. This vertrate means an aircraft was ascending.
+-- was between '[1, 20]'. This vertrate means an aircraft was ascending.
 -- 2. sequenceN: Selects the first sequence from the generated sequences.
---  This first sequence is takeoff and eliminates mid-flight ascents.
+-- This first sequence is takeoff and eliminates mid-flight ascents.
 -- 3. atPeriod: Returns the period of the first sequence.
 flight_traj_time_slice_ascent(icao24, callsign, ascending_trip, ascending_geoaltitude,
-                              ascending_vertrate) AS
-    (SELECT icao24,
-            callsign,
-            atPeriod(time_slice_trip,
-                     period(sequenceN(
-                         atRange(time_slice_vertrate, floatrange '[1,20]'), 1))),
-            atPeriod(time_slice_geoaltitude,
-                     period(sequenceN(atRange(time_slice_vertrate, floatrange '[1,20]'),
-                                      1))),
-            atPeriod(time_slice_vertrate,
-                     period(sequenceN(atRange(time_slice_vertrate, floatrange '[1,20]'),
-                                      1)))
-     FROM flight_traj_time_slice),
-
+ascending_vertrate) AS
+	(SELECT icao24, callsign,
+		atTime(time_slice_trip, sequenceN(atValues(time_slice_vertrate, floatspan '[1,200]'), 1)::tstzspan),
+		atTime(time_slice_geoaltitude,
+			sequenceN(atValues(time_slice_vertrate, floatspan '[1,20]'),1)::tstzspan),
+		atTime(time_slice_vertrate,
+			sequenceN(atValues(time_slice_vertrate, floatspan '[1,20]'),1)::tstzspan)
+	FROM flight_traj_time_slice),
 -- The final_output CTE uses unnest to unpack the temporal data into rows for
 -- visualization in Grafana. Each row will contain a latitude, longitude and the altitude
 -- and vertrate at those locations.
 final_output AS
-    (SELECT icao24,
-            callsign,
-            getValue(unnest(instants(ascending_geoaltitude))) AS geoaltitude,
-            getValue(unnest(instants(ascending_vertrate)))    AS vertrate,
-            ST_X(getValue(unnest(instants(ascending_trip))))  AS lon,
-            ST_Y(getValue(unnest(instants(ascending_trip))))  AS lat
-     FROM flight_traj_time_slice_ascent)
-
+	(SELECT icao24, callsign,
+		getValue(unnest(instants(ascending_geoaltitude))) AS geoaltitude,
+		getValue(unnest(instants(ascending_vertrate))) AS vertrate,
+		ST_X(getValue(unnest(instants(ascending_trip)))) AS lon,
+		ST_Y(getValue(unnest(instants(ascending_trip)))) AS lat
+	FROM flight_traj_time_slice_ascent)
 SELECT *
 FROM final_output
 WHERE vertrate IS NOT NULL
-  AND geoaltitude IS NOT NULL;
+AND geoaltitude IS NOT NULL;
             </programlisting>
             <para>
                 Tips for <emphasis role="strong">QGIS</emphasis> visualization:
@@ -1320,7 +1311,7 @@ WHERE vertrate IS NOT NULL
                 </listitem>
                 <listitem>
             <para>
-                We will also add a manual override (top right of panel options, beside "All") to limit the minimum value of vertebrate. This will make all values
+                We will also add a manual override (top right of panel options, beside "All") to limit the minimum value of vertrate. This will make all values
                 below the minimum the same color, making larger values more obvious. This can be used to quickly
                 pinpoint locations where a large rate of ascent existed.
             </para>

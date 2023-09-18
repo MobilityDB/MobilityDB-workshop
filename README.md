@@ -31,12 +31,12 @@ In addition, pre-generated versions of them are available.
 
 ## Docker container
 
-The workshop dependencies and data files are available in a Docker container running PostgreSQL-12, PostGIS-2.5 and MobilityDB-develop.
+The workshop dependencies and data files are available in a Docker container running PostgreSQL-15, PostGIS-3.4 and MobilityDB-develop (version 1.1).
 
 *  Pull the prebuilt image from the [Docker Hub Registry](https://hub.docker.com/r/mobilitydb/mobilitydb).
 
     ```bash
-    docker pull mobilitydb/mobilitydb:12-2.5-develop-workshop
+    docker pull mobilitydb/mobilitydb:15-3.4-develop
     ```
 
 *  Create a Docker volume to preserve the PostgreSQL database files outside of the container.

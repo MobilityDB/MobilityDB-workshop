@@ -46,3 +46,15 @@ Finally, you will need to add the following line to the `mobilitydb-workshop.xml
 ```
 
 This will include the new chapter in the guide.
+
+## Adding your name to the contributors list
+
+If you feel like your contribution is big enough and want to add your name to the contributors list, you will need to edit the `mobilitydb-workshop.xml` file and add your name to the list of contributors. You will need to add the following line to the `mobilitydb-workshop.xml` file:
+
+```xml
+<othercredit>
+			<firstname>Name</firstname>
+			<surname>Surname</surname>
+			<contrib>Contributed to the workshop guide</contrib>
+</othercredit>
+```

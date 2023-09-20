@@ -1,0 +1,131 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Part 1 - Data and Environment Preparation</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch03.html" title="Chapter 3. Managing Flight Data and Creating Dashboard with Grafana"><link rel="prev" href="ch03s02.html" title="Tools"><link rel="next" href="ch03s04.html" title="Part 2 - Working with Discrete Points"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part 1 - Data and Environment Preparation</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch03s02.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Managing Flight Data and Creating Dashboard with Grafana</th><td width="20%" align="right"> <a accesskey="n" href="ch03s04.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm860"></a>Part 1 - Data and Environment Preparation</h2></div></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm862"></a>Preparing the Database</h3></div></div></div><p>
+            The opensky data can be found in this <a class="ulink" href="https://opensky-network.org/datasets/states/2020-06-01/" target="_top">Dataset
+                link
+            </a>.
+        </p><p>
+            Create a new database <span class="quote">“<span class="quote">opensky</span>”</span>, then use your SQL
+            editor to create the MobilityDB extension as follows:
+        </p><pre class="programlisting">
+CREATE EXTENSION MobilityDB CASCADE;
+        </pre><p>
+            The CASCADE command will additionally create the PostGIS
+            extension.
+        </p><p>
+            Now create a table in which the CSV file will be loaded:
+        </p><pre class="programlisting">
+CREATE TABLE flights(
+    et              bigint,
+    icao24          varchar(20),
+    lat             float,
+    lon             float,
+    velocity        float,
+    heading         float,
+    vertrate        float,
+    callsign        varchar(10),
+    onground        boolean,
+    alert           boolean,
+    spi             boolean,
+    squawk          integer,
+    baroaltitude    numeric(7,2),
+    geoaltitude     numeric(7,2),
+    lastposupdate   numeric(13,3),
+    lastcontact     numeric(13,3)
+);
+</pre><p>
+      Load the data into the database using the following command.
+      Replace the <code class="literal">&lt;path_to_file&gt;</code> with the
+      actual path of the CSV file. Do this for all files. As before, if this command
+      throws a permission error, you can use the <code class="varname">\copy</code> command
+      from the <code class="varname">psql</code> shell.
+    </p><pre class="programlisting">
+COPY flights(et, icao24, lat, lon, velocity, heading,
+		 vertrate, callsign, onground, alert, spi, squawk,
+		 baroaltitude, geoaltitude, lastposupdate, lastcontact)
+FROM '&lt;path_to_file&gt;' DELIMITER  ',' CSV HEADER;
+</pre><p>
+      All the times in this dataset are in unix timestamp (an integer)
+      with timezone being UTC. So we need to convert them to PostgreSQL
+      timestamp type.
+    </p><pre class="programlisting">
+ALTER TABLE flights
+    ADD COLUMN et_ts timestamp,
+    ADD COLUMN lastposupdate_ts timestamp,
+    ADD COLUMN lastcontact_ts timestamp;
+
+UPDATE flights
+    SET et_ts = to_timestamp(et),
+        lastposupdate_ts = to_timestamp(lastposupdate),
+        lastcontact_ts = to_timestamp(lastcontact);
+</pre><p>
+      You can check the size of the database with:
+    </p><pre class="programlisting">
+SELECT pg_size_pretty( pg_total_relation_size('flights') );
+        </pre></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm881"></a>Data Cleaning</h3></div></div></div><p>
+                Delete all icao24 that have all NULL latitudes
+            </p><pre class="programlisting">
+-- icao24_with_null_lat is used to provide a list of rows that will be deleted
+WITH icao24_with_null_lat AS (
+    SELECT icao24, COUNT(lat)
+    FROM flights
+    GROUP BY icao24
+    HAVING COUNT(lat) = 0
+      )
+DELETE
+FROM flights
+WHERE icao24 IN
+-- this SELECT statement is needed for the IN statement to compare against a list
+(SELECT icao24 FROM icao24_with_null_lat);
+            </pre><p>
+                Note: This data cleaning is not comprehensive. It was just to
+                highlight that before creating trajectories, it may be very
+                important to have a look at the data and do some cleaning as
+                that will directly impact the quality of mobilityDB trajectories
+                being created. If there as NULLs in mobilityDB trajectories,
+                some operation on it can give error.
+            </p></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm886"></a>Setting up the Dashboard and Connecting to Data
+            Source
+        </h3></div></div></div><p>
+            Data for the workshop is loaded into a MobilityDB database hosted
+            on Azure, with all login information provided in the
+            <a class="ulink" href="https://www.notion.so/Dashboard-and-Visualization-of-Ship-Trajectories-AIS-246e16838096443ea2bfa9be554a9a44" target="_top">
+                Sign-in
+                and Connect to Data Source
+            </a>
+            section below.
+        </p><p>
+            The workshop is using the following settings in Grafana to connect
+            to the postgres server on Azure. More detailed instruction to
+            set up Grafana can be found in section 2.3 to 2.5 of the Dashboard
+            and Visualization of Ship Trajectories (AIS) workshop.
+        </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                    Name: OpenSkyLOCAL
+                </p></li><li class="listitem"><p>
+                    Host:
+                    <span class="emphasis"><em>20.79.254.53:5432</em></span>
+                </p></li><li class="listitem"><p>
+                    Database: opensky
+                </p></li><li class="listitem"><p>
+                    User:
+                    <span class="emphasis"><em>mobilitydb-guest</em></span>
+                </p></li><li class="listitem"><p>
+                    Password:
+                    <span class="emphasis"><em>mobilitydb@guest</em></span>
+                </p></li><li class="listitem"><p>
+                    TLS/SSL Mode:
+                    <span class="emphasis"><em>disable</em></span>
+                </p></li><li class="listitem"><p>
+                    Version:
+                    <span class="emphasis"><em>12+</em></span>
+                </p></li></ul></div><p>
+            The data used for this workshop provided by
+            <a class="ulink" href="http://www.opensky-network.org" target="_top">The OpenSky
+                Network</a>. This is data from a 24hr period from June 1, 2020
+            (<a class="ulink" href="https://opensky-network.org/datasets/states/2020-06-01/" target="_top">dataset
+            link</a>). The raw data is originally provided in separate CSV
+            documents for each hour of the day.
+        </p><p>
+            Open a new browser and go to
+            <a class="ulink" href="http://localhost:3000/" target="_top">http://localhost:3000/</a>
+            to work in your instance of Grafana. With a new dashboard we can
+            start creating the panels below.
+        </p></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch03s02.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch03.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch03s04.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Tools </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Part 2 - Working with Discrete Points</td></tr></table></div></body></html>

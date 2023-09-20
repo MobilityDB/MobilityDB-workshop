@@ -1,0 +1,304 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"><title>Creating a Dashboard</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch02.html" title="Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)"><link rel="prev" href="ch02s05.html" title="Sign in and Connect to Data Source"><link rel="next" href="ch02s07.html" title="Dynamic Dashboards - Creating Variables"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Creating a Dashboard</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch02s05.html">Prev</a> </td><th width="60%" align="center">Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch02s07.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="creating-a-dashboard"></a>Creating a Dashboard</h2></div></div></div><p>
+      With the dashboard configured, and a datasource added, we can now
+      build different panels to visualize data in intuitive ways.
+    </p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="speed-of-individual-ships"></a>Speed of Individual Ships</h3></div></div></div><p>
+        Let's visualize the speed of the ships using the previously
+        built query. Here we will represent it as a statistic with a
+        color gradient.
+      </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+            Add a new panel
+          </p></li><li class="listitem"><p>
+            Select <span class="emphasis"><em>DanishAIS</em></span> as the data source
+          </p></li><li class="listitem"><p>
+            In Format as, change <span class="quote">&#8220;<span class="quote">Time series</span>&#8221;</span> to
+            <span class="quote">&#8220;<span class="quote">Table</span>&#8221;</span> and choose <span class="quote">&#8220;<span class="quote">Edit SQL</span>&#8221;</span>
+          </p></li><li class="listitem"><p>
+            Here you can add your SQL queries. Let&#8217;s replace the existing
+            query with the following SQL script:
+          </p><pre class="programlisting">
+SELECT mmsi, ABS( twavg(SOG) * 1.852 - twavg( speed(Trip))* 3.6 ) AS SpeedDifference
+FROM Ships
+ORDER BY SpeedDifference DESC
+LIMIT 5;
+</pre></li><li class="listitem"><p>
+            We can also quickly do some datatype transformations to help
+            Grafana correctly interpret the incoming data. Next to the
+            Query button, select <span class="quote">&#8220;<span class="quote">Transform</span>&#8221;</span>, add
+            <span class="quote">&#8220;<span class="quote">Convert field type</span>&#8221;</span> and choose
+            <span class="emphasis"><em>mmsi</em></span> as <span class="emphasis"><em>String.</em></span>
+          </p><div class="figure"><a name="idm433"></a><p class="title"><b>Figure 2.2. Datatype transformations in Grafana</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="60%"><tr><td><img src="images/DatatypeTransformationsInGrafana.png" width="100%" alt="Datatype transformations in Grafana"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+            We will modify some visualization options in the
+            panel on the right.
+          </p><p>
+            First, choose <span class="emphasis"><em>stat</em></span> as the visualization
+          </p><div class="figure"><a name="idm444"></a><p class="title"><b>Figure 2.3. Choosing visualization type</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/ChoosingVisualizationType.png" width="100%" alt="Choosing visualization type"></td></tr></table></div></div></div><br class="figure-break"><p>
+            <span class="strong"><strong>Panel Options:</strong></span> Give the
+            panel the title <span class="emphasis"><em>Incorrect AIS Boat Speed
+            Reporting</em></span>
+          </p><p>
+            <span class="strong"><strong>Value Options:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>
+                Show: All values
+              </p></li><li class="listitem"><p>
+                Fields: speeddifference
+              </p><div class="figure"><a name="idm461"></a><p class="title"><b>Figure 2.4. Value options dialogue box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/ValueOptionsDialogueBox.png" width="100%" alt="Value options dialogue box"></td></tr></table></div></div></div><br class="figure-break"></li></ul></div><p>
+            <span class="emphasis"><em>Note: we can include a limit here instead of in
+            our SQL query as well.</em></span>
+          </p><p>
+            <span class="strong"><strong>Stat Styles:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>
+                Orientation: Horizontal
+              </p><div class="figure"><a name="idm475"></a><p class="title"><b>Figure 2.5. Stat styles dialogue box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/StatStylesDialogueBox.png" width="100%" alt="Stat styles dialogue box"></td></tr></table></div></div></div><br class="figure-break"></li></ul></div><p>
+            <span class="strong"><strong>Standard Options:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                Unit: Velocity &#8594; meter/second (m/s). <span class="emphasis"><em>Note: you
+                can scroll in the drop-down menu to see all
+                options.</em></span>
+              </p></li><li class="listitem"><p>
+                Color scheme: Green-Yellow-Red (by value)
+              </p></li></ul></div><div class="figure"><a name="idm490"></a><p class="title"><b>Figure 2.6. Standard options dialogue box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/StandardOptionsDialogueBox.png" width="100%" alt="Standard options dialogue box"></td></tr></table></div></div></div><br class="figure-break"><p>
+            <span class="strong"><strong>Thresholds:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                remove the existing threshold by clicking the little
+                trash can icon on the right. Adding a threshold will
+                force the visualization to color the data a specific
+                color if the threshold is met.
+              </p></li></ul></div><div class="figure"><a name="idm502"></a><p class="title"><b>Figure 2.7. Thresholds dialogue box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/ThresholdsDialogueBox.png" width="100%" alt="Thresholds dialogue box"></td></tr></table></div></div></div><br class="figure-break"></li></ol></div><p>
+        The final visualization will look like the screenshot below.
+      </p><div class="figure"><a name="idm510"></a><p class="title"><b>Figure 2.8. Individual ship speed statistics visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/IndividualShipSpeedStatisticsVisualization.png" width="100%" alt="Individual ship speed statistics visualization"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="routes-used-most-frequently-visualized-with-a-static-heat-map"></a>Routes Used Most Frequently Visualized with a Static Heat
+      Map</h3></div></div></div><p>
+        We can visualize the routes used by ships with a heat map
+        generated from individual GPS points of the ships. This approach
+        is quite costly, so we will use TABLESAMPLE SYSTEM to specify an
+        approximate percentage of the data to use. If the frequency of
+        locations returned varies in different areas, a heatmap using
+        individual datapoints could be misleading without further data
+        pre-processing. An alternative approach could be to use the
+        postGIS
+         <a class="ulink" href="https://postgis.net/docs/ST_AsGeoJSON.html" target="_top">ST_AsGeoJSON</a>
+        to generate shapes in geoJSON format which can be used in
+         <a class="ulink" href="https://grafana.com/grafana/plugins/grafana-worldmap-panel/" target="_top">Grafana&#8217;s
+        World Map Panel plugin</a>.
+      </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+            Add a panel, select DanishAIS as the data source and Format
+            As Table.
+          </p></li><li class="listitem"><p>
+            Using Edit SQL, add the following SQL code:
+          </p><pre class="programlisting">
+-- NOTE: TABLESAMPLE SYSTEM(40) returns ~40% of the data.
+SELECT
+  latitude,
+  longitude,
+  mmsi
+FROM aisinputfiltered TABLESAMPLE SYSTEM (40)
+</pre></li><li class="listitem"><p>
+            Change the visualization type to
+            <span class="emphasis"><em>Geomap</em></span>.
+          </p></li><li class="listitem"><p>
+            On the map, zoom in to fit the data points into the frame
+            and modify the following visualization options:
+          </p><p>
+            <span class="strong"><strong>Panel Options:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                Title: Route Usage Frequency
+              </p></li></ul></div><p>
+            <span class="strong"><strong>Map View:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                Use current map setting (this will use the current zoom
+                and positioning level as default)
+              </p></li><li class="listitem"><p>
+                Share View: enable (this will sync up the movement and
+                zoom across multiple maps on the same dashboard)
+              </p></li></ul></div><div class="figure"><a name="idm545"></a><p class="title"><b>Figure 2.9. Setting initial view in map view dialogue box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/SettingInitialViewInMapViewDialogueBox.png" width="100%" alt="Setting initial view in map view dialogue box"></td></tr></table></div></div></div><br class="figure-break"><p>
+            <span class="strong"><strong>Data Layer:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                Layer type: Heatmap
+              </p></li><li class="listitem"><p>
+                Location: Coords
+              </p></li><li class="listitem"><p>
+                Latitude field: latitude
+              </p></li><li class="listitem"><p>
+                Longitude field: longitude
+              </p></li><li class="listitem"><p>
+                Weight values: 0.1
+              </p></li><li class="listitem"><p>
+                Radius: 1
+              </p></li><li class="listitem"><p>
+                Blur: 5
+              </p></li></ul></div><div class="figure"><a name="idm569"></a><p class="title"><b>Figure 2.10. Setting up heat-map in data layer dialogue
+            box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/SettingUpHeatMapInDataLayerDialogueBox.png" width="100%" alt="Setting up heat-map in data layer dialogue box"></td></tr></table></div></div></div><br class="figure-break"><p>
+            <span class="strong"><strong>Standard Options:</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                Color scheme: Blue-Yellow-Red (by value).
+              </p></li></ul></div><div class="figure"><a name="idm581"></a><p class="title"><b>Figure 2.11. Choosing color scheme in standard options dialogue
+            box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/ChoosingColorSchemeInStandardOptionsDialogueBox.png" width="100%" alt="Choosing color scheme in standard options dialogue box"></td></tr></table></div></div></div><br class="figure-break"></li></ol></div><p>
+        The final visualization will look like the screenshot below.
+      </p><p>
+        <span class="emphasis"><em>Note: The number of datapoints rendered can be manipulated by
+        changing the parameter of the TABLESAMPLE SYSTEM() call in the
+          query.</em></span>
+      </p><div class="figure"><a name="idm591"></a><p class="title"><b>Figure 2.12. Route usage frequency heat-map visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="90%"><tr><td><img src="images/RouteUsageFrequencyHeatMapVisualization.png" width="100%" alt="Route usage frequency heat-map visualization"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="number-of-boats-moving-through-a-given-area"></a>Number of Boats Moving Through a Given Area</h3></div></div></div><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+            Create a new panel, and set DanishAIS as the Source, Format
+            as: <span class="quote">&#8220;<span class="quote">Table</span>&#8221;</span>.
+          </p></li><li class="listitem"><p>
+            Select visualization as: <span class="quote">&#8220;<span class="quote">Geomap</span>&#8221;</span>
+          </p></li><li class="listitem"><p>
+            Add this SQL in the <span class="quote">&#8220;<span class="quote">SQL editor</span>&#8221;</span> section
+          </p><pre class="programlisting">
+-- Table with bounding boxes over regions of interest
+WITH ports(port_name, port_geom, lat, lng)
+       AS (SELECT p.port_name, p.port_geom, lat, lng
+           FROM
+             -- ST_MakeEnvelope creates geometry against which to check intersection
+             (VALUES ('Rodby',
+                    ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832)::geometry,
+                    54.53, 11.06),
+                   ('Puttgarden',
+                    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)::geometry,
+                    54.64, 11.36)) AS p(port_name, port_geom, lat, lng))
+
+-- p.lat and p.lng will be used to place the port location on the visualization
+SELECT P.port_name,
+       sum(numSequences(atGeometry(S.Trip, P.port_geom))) AS trips_intersect_with_port,
+       p.lat,
+       p.lng
+FROM ports AS P,
+     Ships AS S
+WHERE eintersects(S.Trip, P.port_geom)
+GROUP BY P.port_name, P.lat, P.lng
+</pre><p>
+            <span class="emphasis"><em>Note: You will see queries are build using the
+            WITH statement (common table expressions - CTE). This helps
+            to break the query down into parts, and also helps make it
+            easier to understand by others.</em></span>
+          </p></li><li class="listitem"><p>
+            The options (visualization settings - on the right side of
+            the screen) should be as follows:
+          </p><p>
+            <span class="strong"><strong>Data Layer</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                Layer type: &#8594; <span class="quote">&#8220;<span class="quote">markers</span>&#8221;</span>
+              </p></li><li class="listitem"><p>
+                Style Size: &#8594; <span class="quote">&#8220;<span class="quote">Fixed</span>&#8221;</span> and value: 20
+              </p></li><li class="listitem"><p>
+                Color: &#8594; <span class="quote">&#8220;<span class="quote">trips_intersect_with_port</span>&#8221;</span> (This
+                will color points on the map based on this value)
+              </p></li></ul></div><p>
+            <span class="strong"><strong>Standard options</strong></span>
+          </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                Min &#8594; 88
+              </p></li><li class="listitem"><p>
+                Max &#8594; 97
+              </p></li><li class="listitem"><p>
+                Color scheme &#8594; <span class="quote">&#8220;<span class="quote">Green-Yellow-Red (by
+                value)</span>&#8221;</span>
+              </p></li></ul></div><p>
+            <span class="emphasis"><em>Note: At the writing of this tutorial, the Geomap
+            plugin is in beta and has some minor bugs with how colors
+            are rendered based when the <span class="quote">&#8220;<span class="quote">Min</span>&#8221;</span> and
+            <span class="quote">&#8220;<span class="quote">Max</span>&#8221;</span> values are auto calculated.</em></span>
+          </p></li></ol></div><p>
+        In the visualization below we can see port Rodby has a higher
+        number of ships coming and going to it and that&#8217;s why it is
+        colored red. This visualization can show relative activity of
+        ships in regions and ports.
+      </p><div class="figure"><a name="idm642"></a><p class="title"><b>Figure 2.13. Frequency intersecting with geometric envelop
+        visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/FrequencyIntersectingWithGeometricEnvelopVisualization.png" width="100%" alt="Frequency intersecting with geometric envelop visualization"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="boats-in-close-proximity-in-a-given-time-range"></a>Boats in Proximity in a Given Time Range</h3></div></div></div><p>
+        Follow the similar steps to add a Geomap panel as before, we
+        include the following SQL script:
+      </p><pre class="programlisting">
+-- 2 CTEs are help to make these queries user-friendly; TimeShips and TimeClosestShips.
+WITH
+  -- The TimeShips CTE returns the data for a time period from 1am to 6:30am
+  TimeShips AS (
+    SELECT
+      MMSI,
+      atTime(S.Trip, tstzspan '[2018-01-04 01:00:00, 2018-01-04 06:30:00)' ) AS trip
+    FROM
+      Ships S
+),
+  -- The TimeClosestShips CTE returns the time, location, and closest distance of the boats
+  -- that are within 300m of each other. Note the use of dwithin in the WHERE clause
+  -- improves performance by limiting the computation to only those ships that were within
+  -- 300m.
+  TimeClosestShips AS (
+    SELECT
+      S1.MMSI AS "boat1", S2.MMSI AS "boat_2",
+      startValue( atMin(S1.trip &lt;-&gt; S2.trip)) AS closet_distance,
+      startTimestamp( atMin(S1.trip &lt;-&gt; S2.trip)) AS time_at_closest_dist,
+      S1.trip AS "b1_trip",
+      S2.trip AS "b2_trip"
+    FROM
+      TimeShips S1, TimeShips S2
+    WHERE
+      S1.MMSI &gt; S2.MMSI AND
+      edwithin(S1.Trip, S2.Trip, 300)
+)
+-- The final SELECT is used to project the time_at_closest_distance onto the sequence of
+-- locations to return the lat and long of both ships.
+SELECT  t.boat1, t.boat_2, t.closet_distance, t.time_at_closest_dist,
+  ST_X( ST_Transform( valueAtTimestamp(b1_trip, time_at_closest_dist), 4326) ) AS b1_lng,
+  ST_Y( ST_Transform( valueAtTimestamp(b1_trip, time_at_closest_dist), 4326) ) AS b1_lat,
+  ST_X( ST_Transform( valueAtTimestamp(b2_trip, time_at_closest_dist), 4326) ) AS b2_lng,
+  ST_Y( ST_Transform( valueAtTimestamp(b2_trip, time_at_closest_dist), 4326) ) AS b2_lat
+        
+FROM TimeClosestShips t;
+</pre><p>
+        To add the points to the map modify the following options:
+      </p><p>
+        <span class="strong"><strong>Panel Options:</strong></span>
+      </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+            Title: Ships within 300m
+          </p></li></ul></div><p>
+        <span class="strong"><strong>Map View:</strong></span>
+      </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+            Share view: enabled
+          </p></li></ul></div><p>
+        <span class="strong"><strong>Data Layer:</strong></span>
+      </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+            Layer 1: rename to Boat1
+          </p></li><li class="listitem"><p>
+            Layer type: Heatmap
+          </p></li><li class="listitem"><p>
+            Location: Coords
+          </p></li><li class="listitem"><p>
+            Latitude field: b1_lat
+          </p></li><li class="listitem"><p>
+            Longitude field: b1_lng
+          </p></li><li class="listitem"><p>
+            Radius: 5
+          </p></li><li class="listitem"><p>
+            Blur: 15
+          </p></li></ul></div><p>
+        Click on <span class="quote">&#8220;<span class="quote">+ Add layer</span>&#8221;</span> to add another heat map
+        layer to the data, this time using b2_lat and b2_long as the
+        coordinates. We can also add a layer to show the precise
+        locations with markers for both ships (using b1_lat, b1_lng,
+        b2_lat and b2_long), setting each marker to a different color.
+        For the Boat 1 and Boat 2 Locations, we use the following
+        options:
+      </p><p>
+        <span class="strong"><strong>Data Layer:</strong></span>
+      </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+            Value: 1
+          </p></li><li class="listitem"><p>
+            Color: select different color for each boat.
+          </p></li></ul></div><div class="figure"><a name="idm690"></a><p class="title"><b>Figure 2.14. Multiple layers in data layers dialogue box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/MultipleLayersInDataLayersDialogueBox.png" width="100%" alt="Multiple layers in data layers dialogue box"></td></tr></table></div></div></div><br class="figure-break"><p>
+        The final visualization looks like the below.
+      </p><div class="figure"><a name="idm698"></a><p class="title"><b>Figure 2.15. Visualization of ships within 300m using heat-map</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/VisualizationOfShipsWithin300mUsingHeatMap.png" width="100%" alt="Visualization of ships within 300m using heat-map"></td></tr></table></div></div></div><br class="figure-break"><p>
+        It&#8217;s helpful to include the tooltip for layers to allow users to
+        see the data behind the visualization, which helps in
+        interpretation and is a good way for subject-matter-experts to
+        provide concrete feedback. Using the tooltip, we can quickly see
+        that the same ship can be within 300m to multiple other ships in
+        the same time frame (as seen in the screenshot below). This can
+        result in a higher frequency of results in a heat map view than
+        expected. SQL queries should be modified to ensure they are
+        correctly interpreted.
+      </p><p>
+        Not surprisingly, we see there are lots of results for proximity
+        within ports. We could avoid including results in ports by
+        excluding all results that occur within envelopes defined by
+        ST_MakeEnvelope, as seen in the previous queries.
+      </p><div class="figure"><a name="idm707"></a><p class="title"><b>Figure 2.16. Multiple results for the same ship at various times while
+        in a port</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/MultipleResultsForTheSameShipAtVariousTimesWhileInAPort.png" width="100%" alt="Multiple results for the same ship at various times while in a port"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch02s05.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch02.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch02s07.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Sign in and Connect to Data Source </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Dynamic Dashboards - Creating Variables</td></tr></table></div></body></html>

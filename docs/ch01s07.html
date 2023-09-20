@@ -1,0 +1,104 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"><title>Basic Data Exploration</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch01.html" title="Chapter 1. Managing Ship Trajectories (AIS)"><link rel="prev" href="ch01s06.html" title="Constructing Trajectories"><link rel="next" href="ch01s08.html" title="Analyzing the Trajectories"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Basic Data Exploration</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01s06.html">Prev</a> </td><th width="60%" align="center">Chapter 1. Managing Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch01s08.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm221"></a>Basic Data Exploration</h2></div></div></div><p>
+				The total distance traveled by all ships:
+			</p><p>
+				</p><pre class="programlisting">
+SELECT SUM(length(Trip)) FROM Ships;
+-- 807319558.5805709
+</pre><p>
+			</p><p>
+				This query uses the <code class="varname">length</code> function to compute per trip the sailing distance in meters. We then aggregate over all trips and calculate the sum. Let's have a more detailed look, and generate a histogram of trip lengths:
+			</p><p>
+				</p><pre class="programlisting">
+WITH buckets (bucketNo, RangeKM) AS (
+  SELECT 1, floatspan '[0, 0]' UNION
+  SELECT 2, floatspan '(0, 50)' UNION
+  SELECT 3, floatspan '[50, 100)' UNION
+  SELECT 4, floatspan '[100, 200)' UNION
+  SELECT 5, floatspan '[200, 500)' UNION
+  SELECT 6, floatspan '[500, 1500)' UNION
+  SELECT 7, floatspan '[1500, 10000)' ),
+histogram AS (
+  SELECT bucketNo, RangeKM, count(MMSI) as freq
+  FROM buckets left outer join Ships on (length(Trip)/1000) &lt;@ RangeKM
+  GROUP BY bucketNo, RangeKM
+  ORDER BY bucketNo, RangeKM
+)
+SELECT bucketNo, RangeKM, freq,
+  repeat('&#9642;', ( freq::float / max(freq) OVER () * 30 )::int ) AS bar 
+FROM histogram;
+-- Total query runtime: 2.8 secs
+
+ bucketno |    rangekm    | freq |              bar
+----------+---------------+------+--------------------------------
+        1 | [0, 0]        |  796 | &#9642;&#9642;&#9642;&#9642;&#9642;&#9642;
+        2 | (0, 50)       | 3752 | &#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;&#9642;
+        3 | [50, 100)     |  571 | &#9642;&#9642;&#9642;&#9642;&#9642;
+        4 | [100, 200)    |  452 | &#9642;&#9642;&#9642;&#9642;
+        5 | [200, 500)    |  569 | &#9642;&#9642;&#9642;&#9642;&#9642;
+        6 | [500, 1500)   |  100 | &#9642;
+        7 | [1500, 10000) |   22 |
+(7 rows)
+</pre><p>
+			</p><p>
+				Surprisingly there are trips with zero length. These are clearly noise that can be deleted. Also there are very many short trips, that are less than 50 km long. On the other hand, there are few long trips that are more than 1,500 km long. They look like noise. Normally one should validate more, but to simplify this module, we consider them as noise, and delete them.
+				</p><pre class="programlisting">
+DELETE FROM Ships
+WHERE length(Trip) = 0 OR length(Trip) &gt;= 1500000;
+-- DELETE 820
+</pre><p>
+				Now the <code class="varname">Ships</code> table looks like <a class="xref" href="ch01s07.html#imgtrajsfiltered" title="Figure 1.3. Ship trajectories after filtering">Figure 1.3, &#8220;Ship trajectories after filtering&#8221;</a>.
+			</p><div class="figure-float"><div class="figure"><a name="imgtrajsfiltered"></a><p class="title"><b>Figure 1.3. Ship trajectories after filtering</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/trajsFiltered.png" width="100%" alt="Ship trajectories after filtering"></td></tr></table></div></div></div><br class="figure-break"></div><p>
+				Let's have a look at the speed of the ships. There are two speed values in the data; the speed calculated from the spatiotemporal trajectory <code class="varname">speed(Trip)</code>, and the <code class="varname">SOG</code> attribute. Optimally, the two will be the same. A small variance would still be OK, because of sensor errors. Note that both are temporal floats. In the next query, we compare the averages of the two speed values for every ship:
+				</p><pre class="programlisting">
+SELECT ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) SpeedDifference
+FROM Ships WHERE SOG IS NOT NULL AND
+  ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) &gt; 10.0
+ORDER BY SpeedDifference DESC;
+
+  speeddifference
+-------------------
+ 241.42049907716665
+ 134.61257387558112
+ 112.36643046964278
+ 110.10490793777619
+  81.66118732332465
+   81.5725669336415
+  69.85832834619002
+ 57.232404771295045
+ 52.943341619001586
+ 52.921746684116904
+...
+</pre><p>
+			</p><p>
+				The <code class="varname">twavg</code> computes a time-weighted average of a temporal float. It basically computes the area under the curve, then divides it by the time duration of the temporal float. By doing so, the speed values that remain for longer durations affect the average more than those that remain for shorter durations. Note that SOG is in knot, and Speed(Trip) is in m/s. The query converts both to km/h.
+			</p><p>
+				The query shows the first 10 ship trajectories of the 82 in the table that have a difference of more than 10 km/h. These trajectories are shown in <a class="xref" href="ch01s07.html#imgtrajsWrongSpeed" title="Figure 1.4. Ship trajectories with big difference between speed(Trip) and SOG">Figure 1.4, &#8220;Ship trajectories with big difference between <code class="varname">speed(Trip)</code> and <code class="varname">SOG</code>&#8221;</a>. Again they look like noise, so we remove them with the following query
+				</p><pre class="programlisting">
+DELETE FROM Ships 
+WHERE ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) &gt; 10;
+</pre><p>
+			</p><div class="figure-float"><div class="figure"><a name="imgtrajsWrongSpeed"></a><p class="title"><b>Figure 1.4. Ship trajectories with big difference between <code class="varname">speed(Trip)</code> and <code class="varname">SOG</code></b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/trajsWrongSpeed.png" width="100%" alt="Ship trajectories with big difference between speed(Trip) and SOG"></td></tr></table></div></div></div><br class="figure-break"></div><p>
+				Now we do a similar comparison between the calculated azimuth from the spatiotemporal trajectory, and the attribute COG:
+				</p><pre class="programlisting">
+SELECT ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) AzimuthDifference 
+FROM Ships 
+WHERE ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) &gt; 45.0 
+ORDER BY AzimuthDifference DESC;
+
+ azimuthdifference
+--------------------
+  355.4200584570843
+   348.213417943632
+  333.7458943572906
+  321.5644829906112
+  309.6935360677792
+  308.4444213637132
+  295.5019204058323
+  294.7215887580075
+  267.8656764337898
+ 267.09343294055583
+...
+</pre><p>
+			</p><p>
+				Here we see that the COG is not as accurate as was the case for the SOG attribute. More than 1600 trajectories have an azimuth difference bigger than 45 degrees. <a class="xref" href="ch01s07.html#imgtrajsWrongAzimuth" title="Figure 1.5. Ship trajectories with big difference between azimuth(Trip) and COG">Figure 1.5, &#8220;Ship trajectories with big difference between <code class="varname">azimuth(Trip)</code> and <code class="varname">COG</code>&#8221;</a> visualizes them. Some of them look like noise, but some look fine. For simplicity, we keep them all.
+			</p><div class="figure-float"><div class="figure"><a name="imgtrajsWrongAzimuth"></a><p class="title"><b>Figure 1.5. Ship trajectories with big difference between <code class="varname">azimuth(Trip)</code> and <code class="varname">COG</code></b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/trajsWrongAzimuth.png" width="100%" alt="Ship trajectories with big difference between azimuth(Trip) and COG"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch01s06.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch01.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch01s08.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Constructing Trajectories </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Analyzing the Trajectories</td></tr></table></div></body></html>

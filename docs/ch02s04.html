@@ -1,0 +1,39 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"><title>Setting up the Visualization Dashboard</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch02.html" title="Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)"><link rel="prev" href="ch02s03.html" title="Setting up the Data Source"><link rel="next" href="ch02s05.html" title="Sign in and Connect to Data Source"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Setting up the Visualization Dashboard</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch02s03.html">Prev</a> </td><th width="60%" align="center">Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch02s05.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="setting-up-the-visualization-dashboard"></a>Setting up the Visualization Dashboard</h2></div></div></div><p>
+      We can use  <a class="ulink" href="https://grafana.com/" target="_top">Grafana</a>,
+      an open-source technology, to create a business intelligence
+      dashboard. This will allow different users to set up their own
+      queries and visualizations, or easily slice through data in a
+      visual way for non-technical users.
+    </p><p>
+      Start by setting up Grafana on your system:
+    </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+           <a class="ulink" href="https://grafana.com/docs/grafana/latest/setup-grafana/installation/mac/" target="_top">macOS</a>
+        </p><pre class="programlisting">
+brew update
+brew install grafana
+brew services start grafana
+</pre></li><li class="listitem"><p>
+           <a class="ulink" href="https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/" target="_top">Debian
+          or Ubuntu</a>
+        </p><pre class="programlisting">
+# Note These are instructions for Grafana Enterprise Edition (via APT repository),
+# which they recommend. It includes all the Open Source features and can also use
+# Enterprise features if you have a License.
+
+# Setup Grafana Keys
+sudo apt-get install -y apt-transport-https
+sudo apt-get install -y software-properties-common wget
+wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
+
+# Add repository for stable releases
+echo "deb https://packages.grafana.com/enterprise/deb stable main" 
+  | sudo tee -a /etc/apt/sources.list.d/grafana.list
+
+# Install Grafana
+sudo apt-get update
+sudo apt-get install grafana-enterprise
+</pre></li><li class="listitem"><p>
+           <a class="ulink" href="https://grafana.com/docs/grafana/latest/setup-grafana/installation/windows/" target="_top">Windows</a>
+        </p><p>
+          Use the Windows installer available at the Grafana website.
+        </p></li></ol></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch02s03.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch02.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch02s05.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Setting up the Data Source </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Sign in and Connect to Data Source</td></tr></table></div></body></html>

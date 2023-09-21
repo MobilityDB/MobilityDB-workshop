@@ -9,8 +9,8 @@ Here are links to the documentation of MobilityDB-workshop
 
 Documentation
 
-* [PDF](https://MobilityDB.github.io/MobilityDB-workshop/docs/mobilitydb-workshop.pdf)
-* [EPUB](https://MobilityDB.github.io/MobilityDB-workshop/docs/mobilitydb-workshop.epub)
-* [HTML](https://MobilityDB.github.io/MobilityDB-workshop/docs/index.html)
+* [PDF](https://MobilityDB.github.io/MobilityDB-workshop/mobilitydb-workshop.pdf)
+* [EPUB](https://MobilityDB.github.io/MobilityDB-workshop/mobilitydb-workshop.epub)
+* [HTML](https://MobilityDB.github.io/MobilityDB-workshop/index.html)
 
 

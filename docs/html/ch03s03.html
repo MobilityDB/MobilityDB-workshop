@@ -1,4 +1,4 @@
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Part 1 - Data and Environment Preparation</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch03.html" title="Chapter 3. Managing Flight Data and Creating Dashboard with Grafana"><link rel="prev" href="ch03s02.html" title="Tools"><link rel="next" href="ch03s04.html" title="Part 2 - Working with Discrete Points"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part 1 - Data and Environment Preparation</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch03s02.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Managing Flight Data and Creating Dashboard with Grafana</th><td width="20%" align="right"> <a accesskey="n" href="ch03s04.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm860"></a>Part 1 - Data and Environment Preparation</h2></div></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm862"></a>Preparing the Database</h3></div></div></div><p>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Part 1 - Data and Environment Preparation</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch03.html" title="Chapter 3. Managing Flight Data and Creating Dashboard with Grafana"><link rel="prev" href="ch03s02.html" title="Tools"><link rel="next" href="ch03s04.html" title="Part 2 - Working with Discrete Points"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part 1 - Data and Environment Preparation</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch03s02.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Managing Flight Data and Creating Dashboard with Grafana</th><td width="20%" align="right"> <a accesskey="n" href="ch03s04.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm859"></a>Part 1 - Data and Environment Preparation</h2></div></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm861"></a>Preparing the Database</h3></div></div></div><p>
             The opensky data can be found in this <a class="ulink" href="https://opensky-network.org/datasets/states/2020-06-01/" target="_top">Dataset
                 link
             </a>.
@@ -60,7 +60,7 @@ UPDATE flights
       You can check the size of the database with:
     </p><pre class="programlisting">
 SELECT pg_size_pretty( pg_total_relation_size('flights') );
-        </pre></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm881"></a>Data Cleaning</h3></div></div></div><p>
+        </pre></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm880"></a>Data Cleaning</h3></div></div></div><p>
                 Delete all icao24 that have all NULL latitudes
             </p><pre class="programlisting">
 -- icao24_with_null_lat is used to provide a list of rows that will be deleted
@@ -82,7 +82,7 @@ WHERE icao24 IN
                 that will directly impact the quality of mobilityDB trajectories
                 being created. If there as NULLs in mobilityDB trajectories,
                 some operation on it can give error.
-            </p></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm886"></a>Setting up the Dashboard and Connecting to Data
+            </p></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm885"></a>Setting up the Dashboard and Connecting to Data
             Source
         </h3></div></div></div><p>
             Data for the workshop is loaded into a MobilityDB database hosted

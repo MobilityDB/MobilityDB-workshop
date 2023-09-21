@@ -4,12 +4,10 @@
      style="float: center; margin-right: 10px;" />
      
 -----------------------------------------------
-# **Documentation of the MobilityDB Workshop **
+# **Documentation of the MobilityDB Workshop**
+## **Version 1.1**
 -----------------------------------------------
 
------------------------------
-## **Version 1.1**
------------------------------
 
 The documentation is available in the following formats
 

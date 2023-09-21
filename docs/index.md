@@ -15,6 +15,6 @@ The documentation is available in the following formats
 
 * [PDF](https://MobilityDB.github.io/MobilityDB-workshop/mobilitydb-workshop.pdf)
 * [EPUB](https://MobilityDB.github.io/MobilityDB-workshop/mobilitydb-workshop.epub)
-* [HTML](https://MobilityDB.github.io/MobilityDB-workshop/index.html)
+* [HTML](https://MobilityDB.github.io/MobilityDB-workshop/html/index.html)
 
 

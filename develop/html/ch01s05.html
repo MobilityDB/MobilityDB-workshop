@@ -1,0 +1,44 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Loading the Data</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch01.html" title="Chapter 1. Managing Ship Trajectories (AIS)"><link rel="prev" href="ch01s04.html" title="Preparing the Database"><link rel="next" href="ch01s06.html" title="Constructing Trajectories"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Loading the Data</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01s04.html">Prev</a> </td><th width="60%" align="center">Chapter 1. Managing Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch01s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm168"></a>Loading the Data</h2></div></div></div><p>
+				For importing CSV data into a PostgreSQL database one can use the <code class="varname">COPY</code> command as follows:
+				</p><pre class="programlisting">
+COPY AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus,
+  ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length,
+  TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType,
+  SizeA, SizeB, SizeC, SizeD)
+FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER;
+</pre><p>
+			</p><p>
+				It is possible that the above command fails with a permission error. The reason for this is that <code class="varname">COPY</code> is a server capability, while the CSV file is on the client side. To overcome this issue, one can use the <code class="varname">\copy</code> command of <code class="varname">psql</code> as follows:
+				</p><pre class="programlisting">
+psql -d DanishAIS -c "\copy AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus, ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length, TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType, SizeA, SizeB, SizeC, SizeD) FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER;"
+</pre><p>
+				In addition, if you downloaded the CSV file from <a class="ulink" href="https://github.com/MobilityDB/MobilityDB-workshop/tree/master/data" target="_top">this repo's data</a> , then you will need to add the column 'geom' to the command.
+			</p><p>
+				This import took about 1 minute and 30 seconds on my machine, which is a development laptop. The CSV file has 11,809,593 rows, all of which were correctly imported. For bigger datasets, one could alternative could use the program <a class="ulink" href="https://github.com/dimitri/pgloader" target="_top">pgloader</a>.
+			</p><p>
+				We clean up some of the fields in the table and create spatial points with the following command.
+				</p><pre class="programlisting">
+UPDATE AISInput SET
+  NavigationalStatus = CASE NavigationalStatus WHEN 'Unknown value' THEN NULL END,
+  IMO = CASE IMO WHEN 'Unknown' THEN NULL END,
+  ShipType = CASE ShipType WHEN 'Undefined' THEN NULL END,
+  TypeOfPositionFixingDevice = CASE TypeOfPositionFixingDevice
+  WHEN 'Undefined' THEN NULL END,
+  Geom = ST_SetSRID(ST_MakePoint(Longitude, Latitude), 4326);
+</pre><p>
+			</p><p>
+				The above query took around 1.5 min on my desktop. Let's visualize the spatial points on QGIS.
+			</p><div class="figure-float"><div class="figure"><a name="imgpoints"></a><p class="title"><b>Figure 1.1. Visualizing the input points</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/points.png" width="100%" alt="Visualizing the input points"></td></tr></table></div></div></div><br class="figure-break"></div><p>
+				Clearly, there are noise points that are far away from Denmark or even outside earth. This module will not discuss a thorough data cleaning. However, we do some basic cleaning in order to be able to construct trajectories:
+				</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p>Filter out points that are outside the window defined by bounds point(-16.1,40.18) and point(32.88, 84.17). This window is obtained from the specifications of the projection in <a class="ulink" href="https://epsg.io/25832" target="_top">https://epsg.io/25832</a>.</p></li><li class="listitem"><p>Filter out the rows that have the same identifier (MMSI, T)</p></li></ul></div><p>
+			</p><p>
+				</p><pre class="programlisting">
+CREATE TABLE AISInputFiltered AS
+SELECT DISTINCT ON(MMSI, T) *
+FROM AISInput
+WHERE Longitude BETWEEN -16.1 AND 32.88 AND Latitude BETWEEN 40.18 AND 84.17;
+-- Query returned successfully: 11545496 rows affected, 00:45 minutes execution time.
+SELECT COUNT(*) FROM AISInputFiltered;
+--11545496
+</pre><p>
+			</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch01s04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch01.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch01s06.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Preparing the Database </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Constructing Trajectories</td></tr></table></div></body></html>

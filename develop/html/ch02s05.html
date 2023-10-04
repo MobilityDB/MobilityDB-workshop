@@ -1,0 +1,34 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Sign in and Connect to Data Source</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch02.html" title="Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)"><link rel="prev" href="ch02s04.html" title="Setting up the Visualization Dashboard"><link rel="next" href="ch02s06.html" title="Creating a Dashboard"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Sign in and Connect to Data Source</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch02s04.html">Prev</a> </td><th width="60%" align="center">Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch02s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="sign-in-and-connect-to-data-source"></a>Sign in and Connect to Data Source</h2></div></div></div><p>
+      We can now sign in to Grafana by going to
+       <a class="ulink" href="http://localhost:3000/" target="_top">http://localhost:3000/</a>.
+      Set up a new account if needed. Additional instructions to login
+      can be found here following the
+       <a class="ulink" href="https://grafana.com/docs/grafana/latest/getting-started/build-first-dashboard/" target="_top">build
+      your first dashboard instructions.</a>
+    </p><p>
+      Next, we <span class="strong"><strong>add a data source</strong></span> for
+      Grafana to interact with. In this case, we can follow the
+       <a class="ulink" href="https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/" target="_top">Grafana
+      instructions for adding a data source</a> and search for
+       <a class="ulink" href="https://grafana.com/docs/grafana/latest/datasources/postgres/" target="_top">PostgreSQL</a>
+      as the data source.
+    </p><p>
+      The workshop is using the following settings to connect to the
+      postgres server on Azure.
+    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+          Name: <span class="emphasis"><em>DanishAIS</em></span>
+        </p></li><li class="listitem"><p>
+          Host: <span class="emphasis"><em>20.79.254.53:5432</em></span>
+        </p></li><li class="listitem"><p>
+          Database: <span class="emphasis"><em>danishais</em></span>
+        </p></li><li class="listitem"><p>
+          User: <span class="emphasis"><em>mobilitydb-guest</em></span>
+        </p></li><li class="listitem"><p>
+          Password: <span class="emphasis"><em>mobilitydb@guest</em></span>
+        </p></li><li class="listitem"><p>
+          TLS/SSL Mode: <span class="emphasis"><em>disable</em></span>
+        </p></li><li class="listitem"><p>
+          Version: <span class="emphasis"><em>12+</em></span>
+        </p></li></ul></div><p>
+      Then press save and test.
+    </p><div class="figure"><a name="idm400"></a><p class="title"><b>Figure 2.1. Data Source settings</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/DataSourceSettings.png" width="100%" alt="Data Source settings"></td></tr></table></div></div></div><br class="figure-break"></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch02s04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch02.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch02s06.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Setting up the Visualization Dashboard </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Creating a Dashboard</td></tr></table></div></body></html>

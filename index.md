@@ -1,5 +1,5 @@
 
-<img src="https://MobilityDB.github.io/MobilityDB-workshop/html/images/mobilitydb-logo.png"
+<img src="https://MobilityDB.github.io/MobilityDB-workshop/images/mobilitydb-logo.png"
      alt="MobilityDB icon"
      style="float: center; margin-right: 10px;" />
      
@@ -10,5 +10,5 @@
 
 The documentation is available for the following branches
 
-* [master](https://MobilityDB.github.io/MobilityDB-workshop/master/index.md)
-* [develop](https://MobilityDB.github.io/MobilityDB-workshop/develop/index.md)
+* [master](https://MobilityDB.github.io/MobilityDB-workshop/master/)
+* [develop](https://MobilityDB.github.io/MobilityDB-workshop/develop/)

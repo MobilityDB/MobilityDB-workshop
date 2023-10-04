@@ -6,10 +6,10 @@ of the modules.
 
 ## Documentation
 
-You can generate the workshop documentation from the sources. Go to `/doc` directory and run: 
+You can generate the workshop documentation from the sources. Go to `/docs` directory and run: 
 *  In HTML format
     ```bash
-    xsltproc --stringparam html.stylesheet "docbook.css" --xinclude -o index.html /usr/share/xml/docbook/stylesheet/docbook-xsl/html/chunk.xsl mobilitydb-workshop.xml
+    xsltproc --stringparam html.stylesheet "docbook.css" --stringparam chunker.output.encoding "UTF-8"  --xinclude -o index.html /usr/share/xml/docbook/stylesheet/docbook-xsl/html/chunk.xsl mobilitydb-workshop.xml
     ```
 *  In PDF format
     ```bash
@@ -21,13 +21,21 @@ You can generate the workshop documentation from the sources. Go to `/doc` direc
     ```
 In addition, pre-generated versions of them are available.
 
-*  In HTML format: https://docs.mobilitydb.com/MobilityDB-workshop/master/
-*  In PDF format: https://docs.mobilitydb.com/MobilityDB-workshop/master/mobilitydb-workshop.pdf
-*  In EPUB format: https://docs.mobilitydb.com/MobilityDB-workshop/master/mobilitydb-workshop.epub
+Master branch:
+
+*  In HTML format: https://mobilitydb.github.io/MobilityDB-workshop/master/html/index.html
+*  In PDF format: https://mobilitydb.github.io/MobilityDB-workshop/master/mobilitydb-workshop.pdf
+*  In EPUB format: https://mobilitydb.github.io/MobilityDB-workshop/master/mobilitydb-workshop.epub
+
+Develop branch:
+
+*  In HTML format: https://mobilitydb.github.io/MobilityDB-workshop/develop/html/index.html
+*  In PDF format: https://mobilitydb.github.io/MobilityDB-workshop/develop/mobilitydb-workshop.pdf
+*  In EPUB format: https://mobilitydb.github.io/MobilityDB-workshop/develop/mobilitydb-workshop.epub
 
 ## How the Repo is Organized
 - `/data`: raw data files used for some workshops
-- `/doc`: files needed to generate the workshop documentation from sources
+- `/docs`: files needed to generate the workshop documentation from sources
 
 ## Docker container
 

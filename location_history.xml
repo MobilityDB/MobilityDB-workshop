@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter id ="location_history">
+	<title>Managing Google Location History</title>
+
+	<sect1 id ="loading_location_history">
+		<title>Loading Google Location History Data</title>
+		<para>By activating the Location History in your Google account, you let Google track where you go with every mobile device. You can view and manage your Location History information through Google Maps Timeline. The data is provided in JSON format. An example of such a file is as follows.
+			<programlisting>
+{
+"locations" : [ {
+	"timestampMs" : "1525373187756",
+	"latitudeE7" : 508402936,
+	"longitudeE7" : 43413790,
+	"accuracy" : 26,
+	"activity" : [ {
+		"timestampMs" : "1525373185830",
+		"activity" : [ {
+			"type" : "STILL",
+			"confidence" : 44
+		}, {
+			"type" : "IN_VEHICLE",
+			"confidence" : 16
+		}, {
+			"type" : "IN_ROAD_VEHICLE",
+			"confidence" : 16
+		}, {
+			"type" : "UNKNOWN",
+			"confidence" : 12
+		}, {
+			"type" : "IN_RAIL_VEHICLE",
+			"confidence" : 12
+...
+			</programlisting>
+		</para>
+
+		<para>If we want to load location information into MobilityDB we only need the fields <varname>longitudeE7</varname>, <varname>latitudeE7</varname>, and <varname>timestampMs</varname>. To convert the original JSON file into a CSV file containing only these fields we can use <ulink url="https://stedolan.github.io/jq/">jq</ulink>, a command-line JSON processor. The following command
+			<programlisting language="bash">
+cat location_history.json | jq -r ".locations[] | {latitudeE7, longitudeE7, timestampMs}
+| [.latitudeE7, .longitudeE7, .timestampMs] | @csv" > location_history.csv
+			</programlisting>
+			produces a CSV file of the following format
+			<programlisting>
+508402936,43413790,"1525373187756"
+508402171,43413455,"1525373176729"
+508399229,43413304,"1525373143463"
+508377525,43411499,"1525373113741"
+508374906,43412597,"1525373082542"
+508370337,43418136,"1525373052593"
+...
+			</programlisting>
+			The above command works well for files of moderate size since by default jq loads the whole input text in memory. For very large files you may consider the <varname>--stream</varname> option of jq, which parses input texts in a streaming fashion.
+		</para>
+
+		<para>Now we can import the generated CSV file into PostgreSQL as follows. If the <varname>COPY</varname> command throws a permission 
+		error, you can instead use the <varname>\copy</varname> command of <varname>psql</varname> to import the CSV file.
+			<programlisting language="sql">
+DROP TABLE IF EXISTS location_history;
+
+CREATE TABLE location_history (
+	latitudeE7 float,
+	longitudeE7 float,
+	timestampMs bigint,
+	date date
+);
+
+COPY location_history(latitudeE7, longitudeE7, timestampMs) FROM
+'/home/location_history/location_history.csv' DELIMITER ',' CSV;
+
+UPDATE location_history
+SET date = date(to_timestamp(timestampMs / 1000.0)::timestamptz);
+			</programlisting>
+			Notice that we added an attribute <varname>date</varname> to the table so we can split the full location history, which can comprise data for several years, by date. Since the timestamps are encoded in milliseconds since 1/1/1970, we divide them by 1,000 and apply the functions <varname>to_timestamp</varname> and <varname>date</varname> to obtain corresponding date.
+		</para>
+
+		<para>
+			We can now transform this data into MobilityDB trips as follows.
+			<programlisting language="sql">
+DROP TABLE IF EXISTS locations_mdb;
+
+CREATE TABLE locations_mdb (
+	date date NOT NULL,
+	trip tgeompoint,
+	trajectory geometry,
+	PRIMARY KEY (date)
+);
+
+INSERT INTO locations_mdb(date, trip)
+SELECT date, tgeompoint_seq(array_agg(tgeompoint_inst(
+	ST_SetSRID(ST_Point(longitudeE7/1e7, latitudeE7/1e7),4326),
+	to_timestamp(timestampMs / 1000.0)::timestamptz) ORDER BY timestampMs))
+FROM location_history
+GROUP BY date;
+
+UPDATE locations_mdb
+SET trajectory = trajectory(trip);
+			</programlisting>
+			We convert the longitude and latitude values into standard coordinates values by dividing them by 10<superscript>7</superscript>. These can be converted into PostGIS points in the WGS84 coordinate system with the functions <varname>ST_Point</varname> and <varname>ST_SetSRID</varname>. Also, we convert the timestamp values in miliseconds to <varname>timestamptz</varname> values. We can now apply the function
+			<varname>tgeompointinst</varname> to create a <varname>tgeompoint</varname> of instant duration from the point and the timestamp, collect all temporal points of a day into an array with the function <varname>array_agg</varname>, and finally, create a temporal point containing all the locations of a day using function <varname>tgeompointseq</varname>. We added to the table a <varname>trajectory</varname> attribute to visualize the location history in QGIS is given in <xref linkend="location_history_fig" />.
+		</para>
+
+		<figure id="location_history_fig" float="start"><title>Visualization of the Google location history loaded into MobilityDB.</title>
+			<mediaobject>
+				<imageobject><imagedata scalefit="1" fileref='images/LocationHistory.png' /></imageobject>
+			</mediaobject>
+		</figure>
+
+	</sect1>
+
+</chapter>

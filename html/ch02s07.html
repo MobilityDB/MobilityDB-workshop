@@ -1,0 +1,116 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Dynamic Dashboards - Creating Variables</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch02.html" title="Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)"><link rel="prev" href="ch02s06.html" title="Creating a Dashboard"><link rel="next" href="ch02s08.html" title="Final Dashboard"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Dynamic Dashboards - Creating Variables</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch02s06.html">Prev</a> </td><th width="60%" align="center">Chapter 2. Dashboard and Visualization of Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch02s08.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="dynamic-dashboards---creating-variables"></a>Dynamic Dashboards - Creating Variables</h2></div></div></div><p>
+      We can use variables in Grafana to manipulate time-ranges that are
+      used as inputs to MobilityDB queries. We’ll create a drop-down
+      type variable called
+      <span class="strong"><strong><span class="quote">“<span class="quote">FromTime</span>”</span></strong></span> that
+      will be used as an input for the time period within which a query
+      returns results.
+    </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+          In the dashboard window, click <span class="quote">“<span class="quote">Dashboard
+          settings</span>”</span> icon; the gear symbol, on the
+          top-slightly-right of the window.
+        </p><div class="figure"><a name="idm722"></a><p class="title"><b>Figure 2.17. Dashboard settings gear box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/DashboardSettingsGearBox.png" width="100%" alt="Dashboard settings gear box"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+          Click on the <span class="quote">“<span class="quote">Variables</span>”</span> in the next window on
+          the top-left side of the screen.
+        </p><div class="figure"><a name="idm732"></a><p class="title"><b>Figure 2.18. Selecting Variables in dashboard settings</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="30%"><tr><td><img src="images/SelectingVariablesInDashboardSettings.png" width="100%" alt="Selecting Variables in dashboard settings"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+          You’ll see a screen that explains the variables in Grafana and
+          also points to the
+           <a class="ulink" href="https://grafana.com/docs/grafana/latest/variables/" target="_top">Templates
+          and variables documentation</a>. Click on the <span class="quote">“<span class="quote">Add
+          variable</span>”</span> button.
+        </p></li><li class="listitem"><p>
+          In <span class="quote">“<span class="quote">General</span>”</span>
+        </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+              Name → FromTime
+            </p></li><li class="listitem"><p>
+              Type → Custom
+            </p></li></ul></div></li><li class="listitem"><p>
+          In <span class="quote">“<span class="quote">Custom options</span>”</span> we will manually add all the
+          time ranges with 1 hour increment. e.g. <span class="quote">“<span class="quote">2018-01-04
+          00:00:00, 2018-01-04 01:00:00 … 2018-01-04 23:00:00</span>”</span>
+        </p></li><li class="listitem"><p>
+          You get a screen like below. Towards the bottom there is also
+          a <span class="quote">“<span class="quote">Preview of values</span>”</span> that shows what the
+          drop-down options will look like for the variable you created.
+          In this case, we are creating the timestamps in the same
+          format that MobilityDB will accept.
+        </p><div class="figure"><a name="idm758"></a><p class="title"><b>Figure 2.19. Creating user-defined list of custom variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/CreatingUserDefinedListOfCustomVariables.png" width="100%" alt="Creating user-defined list of custom variables"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+          We can create another variable called <span class="quote">“<span class="quote">ToTime</span>”</span>
+          with values shifted 1 hour. So the starting value would be
+          <span class="quote">“<span class="quote">2018-01-04 01:00:00</span>”</span> and the final value will be
+          <span class="quote">“<span class="quote">2018-01-05 00:00:00</span>”</span>.
+        </p></li></ol></div><p>
+      Now we can modify some queries by including the newly
+      created variables which will return results from a specific time
+      window. We have now provided a user with the ability to
+      dynamically modify visualization queries and slice through time.
+    </p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="dynamic-query-number-of-boats-moving-through-a-given-area-in-a-certain-time-period"></a>Dynamic Query: Number of Boats Moving Through a Given Area
+      in a Certain Time Period</h3></div></div></div><p>
+        In the query code we just need to make slight changes for it to
+        take time values from the variables. In the original query,
+        shown below:
+      </p><pre class="programlisting">
+SELECT P.port_name, 
+      sum( numSequences( atGeometry( S.Trip, P.port_geom))) AS trips_intersect_with_port,
+      p.lat,
+      p.lng
+FROM ports AS P, Ships AS S
+WHERE eintersects(S.Trip, P.port_geom)
+GROUP BY P.port_name, P.lat, P.lng
+</pre><p>
+        We just need to modify the trips_intersect_with_port parameter
+        in the SELECT statement to look like:
+      </p><pre class="programlisting">
+sum
+(numSequences(atGeometry( atTime(S.Trip, tstzspan '[$FromTime, $ToTime)'), P.port_geom)))
+    AS trips_intersect_with_port
+</pre><p>
+        Essentially we just wrapped <span class="quote">“<span class="quote">S.Trip</span>”</span> with
+        <span class="quote">“<span class="quote">atTime()</span>”</span> and passed our custom tstzspan range.
+        The full query with this modification is below:
+      </p><pre class="programlisting">
+-- Table with bounding boxes over regions of interest
+WITH ports(port_name, port_geom, lat, lng)
+       AS (SELECT p.port_name, p.port_geom, lat, lng
+           FROM
+             (VALUES ('Rodby',
+                    ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832)::geometry,
+                    54.53, 11.06),
+                   ('Puttgarden',
+                    ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832)::geometry,
+                    54.64, 11.36)) AS p(port_name, port_geom, lat, lng))
+
+SELECT P.port_name,
+       sum(numSequences(atGeometry(atTime(S.Trip, tstzspan '[$FromTime, $ToTime)'),
+                                   P.port_geom))) AS trips_intersect_with_port,
+       p.lat,
+       p.lng
+FROM ports AS P,
+     Ships AS S
+WHERE eintersects(S.Trip, P.port_geom)
+GROUP BY P.port_name, P.lat, P.lng
+</pre><p>
+        We can select the start time, <span class="quote">“<span class="quote">FromTime</span>”</span> →
+        <span class="quote">“<span class="quote">2018-01-04 02:00:00</span>”</span> &amp; <span class="quote">“<span class="quote">ToTime</span>”</span> →
+        <span class="quote">“<span class="quote">2018-01-04 06:00:00</span>”</span> . As we can see below, the
+        port Rodby has less activity during this period and that’s why
+        it is green now. But overall Rodby has more activity so when we
+        look at the entire days data it is colored red.
+      </p><div class="figure"><a name="idm786"></a><p class="title"><b>Figure 2.20. Visualization of geometry intersection using dynamic
+        variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/VisualizationOfGeometryIntersectionUsingDynamicVariables.png" width="100%" alt="Visualization of geometry intersection using dynamic variables"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="global-variables"></a>Global Variables</h3></div></div></div><p>
+        Grafana also has some
+         <a class="ulink" href="https://grafana.com/docs/grafana/latest/variables/variable-types/global-variables/" target="_top">built-in
+        variables (global variables)</a> that can be used to
+        accomplish the same thing we did with custom variables. We can
+        use the global variables ${__from:date} and ${__to:date} instead
+        of the $FromTime and $ToTime we created. The time range can then
+        be modified with the time range options in the top right of the
+        dashboard.
+      </p><div class="figure"><a name="idm797"></a><p class="title"><b>Figure 2.21. Assigning time range using global variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/AssigningTimeRangeUsingGlobalVariables.png" width="100%" alt="Assigning time range using global variables"></td></tr></table></div></div></div><br class="figure-break"><p>
+        <span class="emphasis"><em>Note: It is important to be aware of the timezone used
+        for the underlying data relative to the queries for global
+        variables. Time zones can be adjusted at the bottom of the time
+        range selection, <span class="quote">“<span class="quote">Change time settings</span>”</span>. For this
+        example, we change the time zone to UTC to match our
+        dataset.</em></span>
+      </p></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch02s06.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch02.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch02s08.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Creating a Dashboard </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Final Dashboard</td></tr></table></div></body></html>

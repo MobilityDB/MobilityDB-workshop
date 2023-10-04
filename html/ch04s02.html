@@ -1,0 +1,190 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Transforming GTFS Data for MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="prev" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="next" href="ch05.html" title="Chapter 5. Managing Google Location History"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Transforming GTFS Data for MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04.html">Prev</a> </td><th width="60%" align="center">Chapter 4. Managing GTFS Data</th><td width="20%" align="right"> <a accesskey="n" href="ch05.html">Next</a></td></tr></table><hr></div><div class="sect1"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm1408"></a>Transforming GTFS Data for MobilityDB</h2></div></div></div><p>
+			We start by creating a table that contains couples of <code class="varname">service_id</code> and <code class="varname">date</code> defining the dates at which a  service is provided.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS service_dates;
+CREATE TABLE service_dates AS (
+SELECT service_id, date_trunc('day', d)::date AS date
+FROM calendar c, generate_series(start_date, end_date, '1 day'::interval) AS d
+WHERE (
+	(monday = 1 AND extract(isodow FROM d) = 1) OR
+	(tuesday = 1 AND extract(isodow FROM d) = 2) OR
+	(wednesday = 1 AND extract(isodow FROM d) = 3) OR
+	(thursday = 1 AND extract(isodow FROM d) = 4) OR
+	(friday = 1 AND extract(isodow FROM d) = 5) OR
+	(saturday = 1 AND extract(isodow FROM d) = 6) OR
+	(sunday = 1 AND extract(isodow FROM d) = 7)
+)
+EXCEPT
+SELECT service_id, date
+FROM calendar_dates WHERE exception_type = 2
+UNION
+SELECT c.service_id, date
+FROM calendar c JOIN calendar_dates d ON c.service_id = d.service_id
+WHERE exception_type = 1 AND start_date &lt;= date AND date &lt;= end_date
+);
+			</pre><p>
+			This table transforms the service patterns in the <code class="varname">calendar</code> table valid between a <code class="varname">start_date</code> and an <code class="varname">end_date</code> taking into account the week days, and then remove the exceptions of type 2 and add the exceptions of type 1 that are specified in table <code class="varname">calendar_dates</code>.
+		</p><p>
+			We now create a table <code class="varname">trip_stops</code> that determines the stops for each trip.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS trip_stops;
+CREATE TABLE trip_stops (
+  trip_id text,
+  stop_sequence integer,
+  no_stops integer,
+  route_id text,
+  service_id text,
+  shape_id text,
+  stop_id text,
+  arrival_time interval,
+  perc float
+);
+
+INSERT INTO trip_stops (trip_id, stop_sequence, no_stops, route_id, service_id,
+  shape_id, stop_id, arrival_time)
+SELECT t.trip_id, stop_sequence, MAX(stop_sequence) OVER (PARTITION BY t.trip_id),
+  route_id, service_id, shape_id, stop_id, arrival_time
+FROM trips t JOIN stop_times s ON t.trip_id = s.trip_id;
+
+UPDATE trip_stops t
+SET perc = CASE
+WHEN stop_sequence =  1 then 0.0
+WHEN stop_sequence =  no_stops then 1.0
+ELSE ST_LineLocatePoint(g.shape_geom, s.stop_geom)
+END
+FROM shape_geoms g, stops s
+WHERE t.shape_id = g.shape_id AND t.stop_id = s.stop_id;
+			</pre><p>
+			We perform a join between <code class="varname">trips</code> and <code class="varname">stop_times</code> and determines the number of stops in a trip. Then, we compute the relative location of a stop within a trip using the function <code class="varname">ST_LineLocatePoint</code>.
+		</p><p>
+			We now create a table <code class="varname">trip_segs</code> that defines the segments between two consecutive stops of a trip.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS trip_segs;
+CREATE TABLE trip_segs (
+  trip_id text,
+  route_id text,
+  service_id text,
+  stop1_sequence integer,
+  stop2_sequence integer,
+  no_stops integer,
+  shape_id text,
+  stop1_arrival_time interval,
+  stop2_arrival_time interval,
+  perc1 float,
+  perc2 float,
+  seg_geom geometry,
+  seg_length float,
+  no_points integer,
+  PRIMARY KEY (trip_id, stop1_sequence)
+);
+
+INSERT INTO trip_segs (trip_id, route_id, service_id, stop1_sequence, stop2_sequence,
+  no_stops, shape_id, stop1_arrival_time, stop2_arrival_time, perc1, perc2)  
+WITH temp AS (
+  SELECT trip_id, route_id, service_id, stop_sequence,
+    LEAD(stop_sequence) OVER w AS stop_sequence2,
+  MAX(stop_sequence) OVER (PARTITION BY trip_id),
+  shape_id, arrival_time, LEAD(arrival_time) OVER w, perc, LEAD(perc) OVER w
+  FROM trip_stops WINDOW w AS (PARTITION BY trip_id ORDER BY stop_sequence)
+)
+SELECT * FROM temp WHERE stop_sequence2 IS NOT null;
+
+UPDATE trip_segs t
+SET seg_geom = ST_LineSubstring(g.shape_geom, perc1, perc2)
+FROM shape_geoms g
+WHERE t.shape_id = g.shape_id;
+
+UPDATE trip_segs
+SET seg_length = ST_Length(seg_geom), no_points = ST_NumPoints(seg_geom);
+			</pre><p>
+			We use twice the <code class="varname">LEAD</code> window function for obtaning the next stop and the next percentage of a given stop and the <code class="varname">MAX</code> window function for obtaining the total number of stops in a trip. Then, we generate the geometry of the segment betwen two stops using the function <code class="varname">ST_LineSubstring</code> and compute the length and the number of points in the segment with functions <code class="varname">ST_Length</code> and <code class="varname">ST_NumPoints</code>.
+		</p><p>
+			The geometry of a segment is a linestring containing multiple points. From the previous table we know at which time the trip arrived at the first point and at the last point of the segment. To determine at which time the trip arrived at the intermediate points of the segments, we create a table <code class="varname">trip_points</code> that contains all the points composing the geometry of a segment.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS trip_points;
+CREATE TABLE trip_points (
+  trip_id text,
+  route_id text,
+  service_id text,
+  stop1_sequence integer,
+  point_sequence integer,
+  point_geom geometry,
+  point_arrival_time interval,
+  PRIMARY KEY (trip_id, stop1_sequence, point_sequence)
+);
+
+INSERT INTO trip_points (trip_id, route_id, service_id, stop1_sequence,
+  point_sequence, point_geom, point_arrival_time)
+WITH temp1 AS (
+  SELECT trip_id, route_id, service_id, stop1_sequence, stop2_sequence,
+	no_stops, stop1_arrival_time, stop2_arrival_time, seg_length,
+	(dp).path[1] AS point_sequence, no_points, (dp).geom as point_geom
+FROM trip_segs, ST_DumpPoints(seg_geom) AS dp
+),
+temp2 AS (
+SELECT trip_id, route_id, service_id, stop1_sequence, stop1_arrival_time,
+	stop2_arrival_time, seg_length, point_sequence, no_points, point_geom
+FROM temp1
+WHERE point_sequence &lt;&gt; no_points OR stop2_sequence = no_stops
+),
+temp3 AS (
+SELECT trip_id, route_id, service_id, stop1_sequence, stop1_arrival_time,
+	stop2_arrival_time, point_sequence, no_points, point_geom,
+	ST_Length(ST_MakeLine(array_agg(point_geom) OVER w)) / seg_length AS perc
+FROM temp2 WINDOW w AS (PARTITION BY trip_id, service_id, stop1_sequence
+	ORDER BY point_sequence)
+)
+SELECT trip_id, route_id, service_id, stop1_sequence, point_sequence, point_geom,
+CASE
+WHEN point_sequence = 1 then stop1_arrival_time
+WHEN point_sequence = no_points then stop2_arrival_time
+ELSE stop1_arrival_time + ((stop2_arrival_time - stop1_arrival_time) * perc)
+END AS point_arrival_time
+FROM temp3;
+			</pre><p>
+			In the temporary table <code class="varname">temp1</code> we use the function <code class="varname">ST_DumpPoints</code> to obtain the points composing the geometry of a segment. Nevertheless, this table contains duplicate points, that is, the last point of a segment is equal to the first point of the next one. In the temporary table <code class="varname">temp2</code> we filter out the last point of a segment unless it is the last segment of the trip. In the temporary table <code class="varname">temp3</code> we compute in the attribute <code class="varname">perc</code> the relative position of a point within a trip segment with window functions. For this we use the function <code class="varname">ST_MakeLine</code> to construct the subsegment from the first point of the segment to the current one, determine the length of the subsegment with function <code class="varname">ST_Length</code> and divide this length by the overall segment length. Finally, in the outer query we use the computed percentage to determine the arrival time to that point.
+		</p><p>
+			Our last temporary table <code class="varname">trips_input</code> contains the data in the format that can be used for creating the MobilityDB trips.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS trips_input;
+CREATE TABLE trips_input (
+  trip_id text,
+  route_id text,
+  service_id text,
+  date date,
+  point_geom geometry,
+  t timestamptz
+);
+
+INSERT INTO trips_input
+SELECT trip_id, route_id, t.service_id, date, point_geom, date + point_arrival_time AS t
+FROM trip_points t JOIN
+( SELECT service_id, MIN(date) AS date FROM service_dates GROUP BY service_id) s
+ON t.service_id = s.service_id;
+			</pre><p>
+			In the inner query of the <code class="varname">INSERT</code> statement, we select the first date of a service in the <code class="varname">service_dates</code> table and then we join the resulting table with the <code class="varname">trip_points</code> table to compute the arrival time at each point composing the trips. Notice that we filter the first date of each trip for optimization purposes because in the next step below we use the <code class="varname">shift</code> function to compute the trips to all other dates. Alternatively, we could join the two tables but this will be considerably slower for big GTFS files.
+		</p><p>
+			Finally, table <code class="varname">trips_mdb</code> contains the MobilityDB trips.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS trips_mdb;
+CREATE TABLE trips_mdb (
+	trip_id text NOT NULL,
+	service_id text NOT NULL,
+	route_id text NOT NULL,
+	date date NOT NULL,
+	trip tgeompoint,
+	PRIMARY KEY (trip_id, date)
+);
+
+INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
+SELECT trip_id, service_id, route_id, date, tgeompoint_seq(array_agg(tgeompoint_inst(point_geom, t) ORDER BY T))
+FROM trips_input
+GROUP BY trip_id, service_id, route_id, date;
+
+INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
+SELECT trip_id, route_id, t.service_id, d.date,
+  shift(trip, make_interval(days =&gt; d.date - t.date))
+FROM trips_mdb t JOIN service_dates d ON t.service_id = d.service_id AND t.date &lt;&gt; d.date;
+			</pre><p>
+			In the first <code class="varname">INSERT</code> statement we group the rows in the <code class="varname">trips_input</code> table by <code class="varname">trip_id</code> and <code class="varname">date</code> while keeping the <code class="varname">route_id</code> atribute, use the <code class="varname">array_agg</code> function to construct an array containing the temporal points composing the trip ordered by time, and compute the trip from this array using the function <code class="varname">tgeompointseq</code>. As explained above, table <code class="varname">trips_input</code> only contains the first date of a trip. In the second <code class="varname">INSERT</code> statement we add the trips for all the other dates with the function <code class="varname">shift</code>.
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter 4. Managing GTFS Data </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Chapter 5. Managing Google Location History</td></tr></table></div></body></html>

@@ -10,5 +10,5 @@
 
 The documentation is available for the following branches
 
-* [master](https://MobilityDB.github.io/MobilityDB-workshop/master/)
-* [develop](https://MobilityDB.github.io/MobilityDB-workshop/develop/)
+* [Master](https://MobilityDB.github.io/MobilityDB-workshop/master/)
+* [Develop](https://MobilityDB.github.io/MobilityDB-workshop/develop/)

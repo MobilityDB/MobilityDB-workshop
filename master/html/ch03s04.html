@@ -1,0 +1,206 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Part 2 - Working with Discrete Points</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch03.html" title="Chapter 3. Managing Flight Data and Creating Dashboard with Grafana"><link rel="prev" href="ch03s03.html" title="Part 1 - Data and Environment Preparation"><link rel="next" href="ch03s05.html" title="Part 3 - Working with Continuous Trajectories in MobilityDB"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part 2 - Working with Discrete Points</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch03s03.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Managing Flight Data and Creating Dashboard with Grafana</th><td width="20%" align="right"> <a accesskey="n" href="ch03s05.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm915"></a>Part 2 - Working with Discrete Points</h2></div></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm917"></a>Visualizing 24hr Flight Pattern of Single Airplane</h3></div></div></div><p>
+            We will start by looking at a single airplane. Grafana proves to
+            be a good way to quickly visualize our dataset and can be useful
+            to support pre-processing and cleaning. If using a connection to
+            the Azure database, required tables are already created.
+        </p><p>
+            A full description of each parameter is included in the
+            <a class="ulink" href="https://opensky-network.org/datasets/states/README.txt" target="_top">OpenSky
+                original dataset readme</a>. The table structure in the Azure
+            dataset after loading and transformations looks like the
+            following:
+        </p><div class="figure"><a name="idm922"></a><p class="title"><b>Figure 3.1. First row of table <span class="quote">“<span class="quote">single_airframe</span>”</span>, with
+                24hrs of flight information for airplane
+                <span class="quote">“<span class="quote">c827a6</span>”</span>
+            </b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="40%"><tr><td><img src="images/SingleAirframeRow1.png" width="100%" alt="First row of table “single_airframe”, with 24hrs of flight information for airplane “c827a6”"></td></tr></table></div></div></div><br class="figure-break"><div class="figure"><a name="idm933"></a><p class="title"><b>Figure 3.2. Full table <span class="quote">“<span class="quote">single_airframe_traj</span>”</span> for airplane
+                <span class="quote">“<span class="quote">c827a6</span>”</span>
+                with data in mobilityDB trajectories
+                format
+            </b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/SingleAirframeTrajTable.png" width="100%" alt="Full table “single_airframe_traj” for airplane “c827a6” with data in mobilityDB trajectories format"></td></tr></table></div></div></div><br class="figure-break"><div class="figure"><a name="idm944"></a><p class="title"><b>Figure 3.3. First row of table <span class="quote">“<span class="quote">flight_traj_sample</span>”</span>, which
+                includes 200 flight trajectories.
+            </b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/FlightTrajSampleTable.png" width="100%" alt="First row of table “flight_traj_sample”, which includes 200 flight trajectories."></td></tr></table></div></div></div><br class="figure-break"><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm953"></a>Change Timezone in Grafana</h4></div></div></div><p>
+                Make Sure you are visualizing the data in the correct timezone.
+                The data we had was in UTC. To change the timezone,
+            </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        Click on the time-range panel on the top-right of the
+                        window.
+                    </p><div class="figure"><a name="idm959"></a><p class="title"><b>Figure 3.4. Grafana time range panel</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="60%"><tr><td><img src="images/GrafanaTimerangePanelOpen.png" width="100%" alt="Grafana time range panel"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+                        In the pop-up window, on the bottom there is <span class="quote">“<span class="quote">Change
+                        time settings</span>”</span>. Click that to set the desired
+                        timezone.
+                    </p></li></ol></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm969"></a>Visualize the Coordinates of a Single Airplane</h4></div></div></div><p>
+                Let’s visualize the latitude and longitude coordinates of an
+                airplane’s journey throughout the day. For this one we will not
+                color the geo-markers, but it is possible to color them using
+                some criterion.
+            </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        Add a new panel
+                    </p></li><li class="listitem"><p>
+                        Select <span class="quote">“<span class="quote">OpenSkyLOCAL</span>”</span> as the data source
+                    </p></li><li class="listitem"><p>
+                        In Format as, change <span class="quote">“<span class="quote">Time series</span>”</span> to
+                        <span class="quote">“<span class="quote">Table</span>”</span>
+                        and choose
+                        <span class="quote">“<span class="quote">Edit SQL</span>”</span>
+                    </p></li><li class="listitem"><p>
+                        Here you can add your SQL queries. Let’s replace the existing
+                        query with the following SQL script:
+                    </p><pre class="programlisting">
+-- icao24 is the unique identifier for each airframe (airplane)
+SELECT et_ts, icao24, lat, lon
+-- TABLESAMPLE SYSTEM (n) returns only n% of the data from the table.
+FROM flights TABLESAMPLE SYSTEM (5)
+WHERE icao24 IN ('738286') AND $__timeFilter(et_ts)
+                    </pre></li><li class="listitem"><p>
+                        Change the visualization type to
+                        “<span class="emphasis"><em>Geomap”</em></span>.
+                    </p></li><li class="listitem"><p>
+                        The options (visualization settings - on the right side of
+                        the screen) should be as follows:
+                    </p><p>
+                        <span class="strong"><strong>Panel Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Title →GPS location over time
+                            </p></li></ul></div><p>
+                        <span class="strong"><strong>Map View</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Initial view: For this one zoom in on the visualization
+                                on the panel as you see fit and then click <span class="quote">“<span class="quote">use
+                                current map settings
+                            </span>”</span> button.
+                            </p></li></ul></div><p>
+                        <span class="strong"><strong>Data Layer</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Layer type: →
+                                <span class="quote">“<span class="quote">markers</span>”</span>
+                            </p></li><li class="listitem"><p>
+                                Style size → Fixed Value: 2
+                            </p></li><li class="listitem"><p>
+                                Color → Green
+                            </p></li></ul></div></li></ol></div><p>
+                In this visualization we can see that the airplane is visiting
+                different countries and almost completing a loop. This indicates
+                that there are more than 1 trips (flights) completed by this
+                single airplane. The coordinates are sparse because we are
+                sampling the results using
+                <span class="quote">“<span class="quote">TABLESAMPLE SYSTEM (5)</span>”</span>
+                in our query. This is done to speed up the visualization.
+            </p><div class="figure"><a name="idm1014"></a><p class="title"><b>Figure 3.5. Single airframe geopoints vs time</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/SingleAirframeGeopointsVsTime.png" width="100%" alt="Single airframe geopoints vs time"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1021"></a>Time-series Graphs for a Single Airplane</h3></div></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1023"></a>Velocity vs Time</h4></div></div></div><p>
+                Following the similar steps to add a Geomap panel as before, we
+                include the following SQL script. Note $__timeFilter() is a
+                Grafana global variable. This global variable will inject time
+                constraint SQL-conditions from Grafana’s time range panel.
+            </p><div class="orderedlist"><ol class="orderedlist compact" type="1"><li class="listitem"><p>
+                        In Format as, use
+                        <span class="quote">“<span class="quote">Time series</span>”</span>
+                    </p></li></ol></div><pre class="programlisting">
+SELECT
+  et_ts AS "time",
+  velocity
+FROM flights
+WHERE icao24 = 'c827a6' AND $__timeFilter(et_ts)
+            </pre><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        Change the visualization type to <span class="quote">“<span class="quote">Time Series</span>”</span>.
+                    </p></li><li class="listitem"><p>
+                        The options (visualization settings - on the right side of
+                        the screen) should be as follows:
+                    </p><p>
+                        <span class="strong"><strong>Panel Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Title → Single AirFrame - Velocity vs Time
+                            </p></li></ul></div></li></ol></div><p>
+                In the visualization we can see clearly that on this day, this
+                airframe took 3 flights. That is why its speed curve has 3
+                humps. The zero speed towards the end of each hump is a clear
+                indicator that plane stopped, thus it must have completed its
+                flight.
+            </p><div class="figure"><a name="idm1043"></a><p class="title"><b>Figure 3.6. Single airframe velocity vs time</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/SingleAirframeVelocityVsTime.png" width="100%" alt="Single airframe velocity vs time"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1050"></a>Altitude vs Time</h4></div></div></div><p>
+                Follow the similar steps to add a Geomap panel as before, we
+                include the following SQL script.
+            </p><div class="orderedlist"><ol class="orderedlist compact" type="1"><li class="listitem"><p>
+                        In Format as, we have
+                        <span class="quote">“<span class="quote">Time series</span>”</span>
+                    </p></li></ol></div><pre class="programlisting">
+SELECT
+  et_ts AS "time",
+  baroaltitude, geoaltitude
+FROM flights
+WHERE icao24 = 'c827a6' AND $__timeFilter(et_ts)
+            </pre><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        Change the visualization type to <span class="quote">“<span class="quote">Time Series</span>”</span>.
+                    </p></li><li class="listitem"><p>
+                        The options (visualization settings - on the right side of
+                        the screen) should be as follows:
+                    </p><p>
+                        <span class="strong"><strong>Panel Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Title → Single AirFrame - Altitude vs Time
+                            </p></li></ul></div></li></ol></div><p>
+                In the visualization we can again see that on this day, the
+                airframe took 3 flights, as altitude reaches zero between each
+                flight. There is some noise in the data, which appear as spikes.
+                This would be almost impossible to spot in a tabular format, but
+                on a line graph these data anomalies can be easily identified.
+            </p><div class="figure"><a name="idm1070"></a><p class="title"><b>Figure 3.7. Single airframe altitude vs time</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/SingleAirframeAltitudeVsTime.png" width="100%" alt="Single airframe altitude vs time"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1077"></a>Vertical-Rate vs Time</h4></div></div></div><p>
+                Follow the similar steps to add a Geomap panel as before, we
+                include the following SQL script.
+            </p><div class="orderedlist"><ol class="orderedlist compact" type="1"><li class="listitem"><p>
+                        In Format as, we have
+                        <span class="quote">“<span class="quote">Time series</span>”</span>
+                    </p></li></ol></div><pre class="programlisting">
+SELECT
+  et_ts AS "time",
+  vertrate
+FROM flights
+WHERE icao24 = 'c827a6' AND $__timeFilter(et_ts)
+            </pre><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        Change the visualization type to <span class="quote">“<span class="quote">Time Series</span>”</span>.
+                    </p></li><li class="listitem"><p>
+                        The options (visualization settings - on the right side of
+                        the screen) should be as follows:
+                    </p><p>
+                        <span class="strong"><strong>Panel Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Title → Single AirFrame - Verticle-Rate vs Time
+                            </p></li></ul></div></li></ol></div><p>
+                The positive values here represents the ascent of the plane.
+                While at cruising altitude, the plane has almost zero
+                vertical-rate and during decent this value becomes negative. So
+                a sequence of positive values, then zero values followed by
+                negative values would represent a single flight.
+            </p><div class="figure"><a name="idm1097"></a><p class="title"><b>Figure 3.8. Single airframe vertrate vs time</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/SingleAirframeVertrateVsTime.png" width="100%" alt="Single airframe vertrate vs time"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1104"></a>Callsign vs Time</h4></div></div></div><p>
+                The callsign is a unique identifier used for a specific flight
+                path. For example, ANZ1220 is the callsign of the Air New
+                Zealand flight 1220 from Queenstown to Auckland in New Zealand.
+                It is possible for single airplane to make the same flight more
+                than once in a 24hr period if it goes back and forth. This
+                information will be used in later queries to partition an
+                airplanes data into multiple flights.
+            </p><p>
+                We can find the time at which the callsign of an airplane
+                changes with the following steps.
+            </p><div class="orderedlist"><ol class="orderedlist compact" type="1"><li class="listitem"><p>
+                        In Format as, we have
+                        <span class="quote">“<span class="quote">Table</span>”</span>
+                    </p></li></ol></div><pre class="programlisting">
+SELECT
+  min(et_ts) AS "time", callsign
+FROM flights
+WHERE icao24 = 'c827a6'
+GROUP BY callsign
+            </pre><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        Change the visualization type to <span class="quote">“<span class="quote">Table</span>”</span>.
+                    </p></li><li class="listitem"><p>
+                        The options (visualization settings - on the right side of
+                        the screen) should be as follows:
+                    </p><p>
+                        <span class="strong"><strong>Panel Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Title → Single AirFrame - Callsign vs Time
+                            </p></li></ul></div></li></ol></div><p>
+                In the visualization we can see that this airplane completed 3
+                flights and started the 4th one towards the very end of the day.
+                We also see there is some NULL data in the callsign column which
+                is why the first timestamp doesn’t have a corresponding
+                callsign.
+            </p><div class="figure"><a name="idm1125"></a><p class="title"><b>Figure 3.9. Single airframe callsign vs time</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/SingleAirframeCallsignVsTime.png" width="100%" alt="Single airframe callsign vs time"></td></tr></table></div></div></div><br class="figure-break"></div></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch03s03.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch03.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch03s05.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Part 1 - Data and Environment Preparation </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Part 3 - Working with Continuous Trajectories in MobilityDB</td></tr></table></div></body></html>

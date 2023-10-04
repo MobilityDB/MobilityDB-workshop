@@ -1,0 +1,338 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Part 3 - Working with Continuous Trajectories in MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch03.html" title="Chapter 3. Managing Flight Data and Creating Dashboard with Grafana"><link rel="prev" href="ch03s04.html" title="Part 2 - Working with Discrete Points"><link rel="next" href="ch03s06.html" title="Complete Flight Data Business Intelligence Dashboard"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part 3 - Working with Continuous Trajectories in MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch03s04.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Managing Flight Data and Creating Dashboard with Grafana</th><td width="20%" align="right"> <a accesskey="n" href="ch03s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm1132"></a>Part 3 - Working with Continuous Trajectories in MobilityDB</h2></div></div></div><p>
+            For the following queries, we will make use of trajectories for
+            aggregation and creating effective splits in our data based on
+            parameters that change in time.
+        </p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1135"></a>Creating MobilityDB Trajectories</h3></div></div></div><p>
+                This step is completed once, only on the ingestion of data. It
+                is shown below to provide an understanding of how to do it. With
+                temporal datatypes and mobilityDB functionality, we can see the
+                queries are very intuitive to create.
+            </p><p>
+                We first create a geometry point. This treats each latitude and
+                longitude as a point in space. 4326 is the SRID.
+            </p><pre class="programlisting">
+ALTER TABLE flights
+    ADD COLUMN geom geometry(Point, 4326);
+
+UPDATE flights SET
+  geom = ST_SetSRID( ST_MakePoint( lon, lat ), 4326);
+</pre><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1140"></a>AirFrame Trajectories</h4></div></div></div><p>
+          Now we are ready to construct airframe or airplane
+          trajectories out of their individual observations. Each
+          <span class="quote">“<span class="quote">icao24</span>”</span> in our dataset represents a single
+          airplane.
+        </p><p>
+          We can create a composite index on icao24 (unique to each
+          plane) and et_ts (timestamps of observations) to help improve
+          the performance of trajectory generation.
+        </p><pre class="programlisting">
+CREATE INDEX icao24_time_index
+    ON flights (icao24, et_ts);
+</pre><p>
+          We create trajectories for a single airframe because:
+        </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+              this query serves as a simple example of how to use
+              mobilityDB to create trajectories
+            </p></li><li class="listitem"><p>
+              these kind of trajectories can be very important for plane
+              manufacturer, as they are interested in the airplane’s
+              analysis.
+            </p></li><li class="listitem"><p>
+              we are creating the building blocks for future queries.
+              Each row would represent a single flight, where flight is
+              identified by icao24 &amp; callsign.
+            </p></li></ul></div><pre class="programlisting">
+CREATE TABLE airframe_traj(icao24, trip, velocity, heading, vertrate, callsign, squawk,
+                           geoaltitude) AS
+SELECT icao24,
+       tgeompoint_seq(array_agg(tgeompoint_inst(geom, et_ts) ORDER BY et_ts)
+                      FILTER (WHERE geom IS NOT NULL)),
+       tfloat_seq(array_agg(tfloat_inst(velocity, et_ts) ORDER BY et_ts)
+                  FILTER (WHERE velocity IS NOT NULL)),
+       tfloat_seq(array_agg(tfloat_inst(heading, et_ts) ORDER BY et_ts)
+                  FILTER (WHERE heading IS NOT NULL)),
+       tfloat_seq(array_agg(tfloat_inst(vertrate, et_ts) ORDER BY et_ts)
+                  FILTER (WHERE vertrate IS NOT NULL)),
+       ttext_seq(array_agg(ttext_inst(callsign, et_ts) ORDER BY et_ts)
+                 FILTER (WHERE callsign IS NOT NULL)),
+       tint_seq(array_agg(tint_inst(squawk, et_ts) ORDER BY et_ts)
+                FILTER (WHERE squawk IS NOT NULL)),
+       tfloat_seq(array_agg(tfloat_inst(geoaltitude, et_ts) ORDER BY et_ts)
+                  FILTER (WHERE geoaltitude IS NOT NULL))
+FROM flights
+GROUP BY icao24;
+                </pre><p>
+                    Here we create a new table for all the trajectories. We select
+                    all the attributes of interest that change over time. We
+                    can follow the transformation from the inner call to the outer
+                    call:
+                </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                            tgeompoint_inst: combines each geometry point(lat, long)
+                            with the timestamp where that point existed
+                        </p></li><li class="listitem"><p>
+                            array_agg: aggregates all the instants together into a
+                            single array for each item in the group by. In this case,
+                            it will create an array for each icao24
+                        </p></li><li class="listitem"><p>
+                            tgeompoint_seq: constructs the array as a sequence which
+                            can be manipulated with mobilityDB functionality. The same
+                            approach is used for each trajectory, with the function
+                            used changing depending on the datatype.
+                        </p></li></ul></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1163"></a>Flight Trajectories</h4></div></div></div><p>
+                Right now we have, in a single row, an airframe’s (where an
+                airframe is a single physical airplane) entire day’s trip
+                information. We would like to segment that information per
+                flight (an airframe flying under a specific callsign). This
+                query segments the airframe trajectories (in temporal columns)
+                based on the time period of the callsign. Below we explain the
+                query and the reason behind segmenting the data this way.
+            </p><pre class="programlisting">
+-- Each row from airframe will create a new row in flight_traj depending on when the
+-- callsign changes, regardless of whether a plane repeats the same flight multiple
+-- times in any period
+
+-- Airplane123 (airframe_traj) |-------------------------|
+-- Flightpath1 (flight_traj)   |-----|
+-- Flightpath2 (flight_traj)         |--------|
+-- Flightpath1 (flight_traj)                  |-------|
+-- Flightpath3 (flight_traj)                          |--|
+</pre><pre class="programlisting">
+CREATE TABLE flight_traj(icao24, callsign, flight_period, trip, velocity, heading,
+                         vertrate, squawk, geoaltitude)
+AS
+    -- callsign sequence unpacked into rows to split all other temporal sequences.
+WITH airframe_traj_with_unpacked_callsign AS
+	(SELECT icao24, 
+            trip, 
+            velocity, 
+            heading, 
+            vertrate, 
+            squawk, 
+            geoaltitude, 
+            startValue(unnest(segments(callsign))) AS start_value_callsign,
+		    unnest(segments(callsign))::tstzspan AS callsign_segment_period
+	FROM airframe_traj)
+SELECT icao24 AS icao24, 
+        start_value_callsign AS callsign, 
+        callsign_segment_period AS flight_period, 
+        atTime(trip, callsign_segment_period) AS trip, 
+        atTime(velocity, callsign_segment_period) AS velocity, 
+        atTime(heading, callsign_segment_period) AS heading, 
+        atTime(vertrate, callsign_segment_period) AS vertrate, 
+        atTime(squawk, callsign_segment_period) AS squawk, 
+        atTime(geoaltitude, callsign_segment_period) AS geoaltitude
+FROM airframe_traj_with_unpacked_callsign;
+            </pre><p>
+                <span class="strong"><strong>Note:</strong></span>
+                We could have tried to
+                create the above (table ”flight_traj”) per flight trajectories
+                by simply including <span class="quote">“<span class="quote">callsign</span>”</span> in the GROUP BY
+                statement in the query used to create the previous
+                airframe_traj table
+                (<code class="literal">GROUP BY icao24, callsign;</code>).
+            </p><p>
+                The <span class="strong"><strong>problem</strong></span> with this
+                solution: This approach would put the trajectory data of 2
+                distinct flights where that airplane and flight number are the
+                same in a single row, which is not correct.
+            </p><p>
+                MobilityDB functions helped us avoid the use of several
+                hardcoded conditions that depend on user knowledge of the data.
+                This approach is very generic and can be applied anytime we want
+                to split a trajectory by the inflection points in time of some
+                other trajectory.
+            </p></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1175"></a>Aggregating Flight Statistics</h3></div></div></div><p>
+            We can now use our trajectories to pull flight specific statistics
+            very easily.
+        </p><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1178"></a>Average Velocity of Each Flight</h4></div></div></div><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        In Format as, we have
+                        <span class="quote">“<span class="quote">Table</span>”</span>
+                    </p><pre class="programlisting">
+-- Average flight speeds during flight
+SELECT callsign,twavg(velocity) AS average_velocity
+FROM flight_traj
+WHERE twavg(velocity)IS NOT NULL -- drop rows without velocity data
+AND twavg(velocity) &lt; 1500 -- removes erroneous data
+ORDER BY twavg(velocity) desc;
+                    </pre></li><li class="listitem"><p>
+                        Change the visualization type to <span class="quote">“<span class="quote">Bar gauge</span>”</span>.
+                    </p></li><li class="listitem"><p>
+                        The options (visualization settings - on the right side of
+                        the screen) should be as follows
+                    </p><p>
+                        <span class="strong"><strong>Panel Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Title → Average Flight Speed
+                                Show → All values 
+                            </p></li></ul></div><p>
+                        <span class="strong"><strong>Bar gauge</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Orientation → Horizontal
+                            </p></li></ul></div><p>
+                        <span class="strong"><strong>Standard Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Unit → meters/second (m/s)
+                            </p></li><li class="listitem"><p>
+                                Min → 200
+                            </p></li></ul></div><p>
+                        The settings we adjust improve the visualization by cutting
+                        the bar graph values of 0-200, improving the resolution at
+                        higher ranges to see differences.
+                    </p><div class="figure"><a name="idm1208"></a><p class="title"><b>Figure 3.10. Average flight speed visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/AverageFlightSpeedVisualization.png" width="100%" alt="Average flight speed visualization"></td></tr></table></div></div></div><br class="figure-break"></li></ol></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1215"></a>Number of Private and Commercial Flights</h4></div></div></div><p>
+                We can easily combine results from multiple queries in the same
+                visualization in Grafana, simplifying the queries themselves.
+                Here we apply some domain knowledge of sport pilot aircraft
+                license limits for altitude and speed to provide an estimated
+                count of each.
+            </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        In Format as, we have
+                        <span class="quote">“<span class="quote">Table</span>”</span>
+                    </p><pre class="programlisting">
+-- Flights completed by private pilots (estimate)
+SELECT COUNT(callsign) AS private_flight
+FROM flight_traj
+WHERE (maxValue(velocity) IS NOT NULL -- remove flights without velocity
+    AND maxValue(velocity) &lt;= 65) -- sport aircraft max is 140mph (65m/s)
+AND (maxValue(geoaltitude) IS NOT NULL -- remove flights without altitude
+    AND maxValue(geoaltitude) &lt;= 5500); --18,000ft (5,500m) max for private pilot
+
+-- Count of commercial flights (estimate)
+SELECT COUNT(callsign) AS commercial_flight
+FROM flight_traj
+WHERE (maxValue(velocity) IS NOT NULL
+    AND maxValue(velocity) &gt; 65)
+AND (maxValue(geoaltitude) IS NOT NULL
+    AND maxValue(geoaltitude) &gt; 5500);
+          </pre><p>
+            In Grafana, when we are in the query editor we can click on
+            <span class="quote">“<span class="quote">+ Query</span>”</span> at the bottom to add multiple queries
+            that provide different results.
+          </p><div class="figure"><a name="idm1225"></a><p class="title"><b>Figure 3.11. Multiple queries providing results for a single
+            visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="90%"><tr><td><img src="images/MultipleQueriesSingleVisualization.png" width="100%" alt="Multiple queries providing results for a single visualization"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+            Change the visualization type to <span class="quote">“<span class="quote">Stat</span>”</span>.
+          </p><p>
+            To label the data for each result separately, choose
+            <span class="quote">“<span class="quote">Overrides</span>”</span> at the top of the options panel on
+            the right. Here you can override global panel settings for
+            specific attributes as shown below.
+          </p><div class="figure"><a name="idm1237"></a><p class="title"><b>Figure 3.12. Override options for panel with multiple
+            queries</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/OverrideOptionsMultipleQueries.png" width="100%" alt="Override options for panel with multiple queries"></td></tr></table></div></div></div><br class="figure-break"></li></ol></div><p>
+        The final statistics visualization will look like this:
+      </p><div class="figure"><a name="idm1245"></a><p class="title"><b>Figure 3.13. Statistic visualization of number of flights by license
+        type</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="30%"><tr><td><img src="images/StatisticVisualizationByFlightType.png" width="100%" alt="Statistic visualization of number of flights by license type"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1252"></a>Flights Taking-off in Some Interval of Time (User-Defined)</h3></div></div></div><p>
+                <span class="strong"><strong>Note:</strong></span>
+                This query makes used
+                of a sample set of data that has 200 flights to return results.
+                <span class="quote">“<span class="quote">flight_traj_sample</span>”</span>
+                is just a sampled version of
+                <span class="quote">“<span class="quote">flight_traj</span>”</span>. As of the writing of this workshop,
+                Grafana does not support display of vectors, and so individual
+                latitude and longitude points are used as a proxy.
+            </p><p>
+            In order to make the query use Grafana global time range panel replace 
+            the hard-coded timestamps with the  ‘[${__from:date}, ${__to:date} )’.
+            </p><pre class="programlisting">
+WITH
+-- The flight_traj_time_slice CTE is clipping all the temporal columns
+-- to the user specified time-range.
+flight_traj_time_slice (icao24, callsign, time_slice_trip, time_slice_geoaltitude,
+time_slice_vertrate) AS
+	(SELECT icao24, callsign,
+		atTime(trip, tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)'), -- I changed the dates to fit my data, you should do the same!!
+		atTime(geoaltitude, tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)'),
+		atTime(vertrate, tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)')
+	FROM flight_traj_sample TABLESAMPLE SYSTEM (20)),
+-- There are 3 things happening in the flight_traj_time_slice_ascent CTE:
+-- 1. atRange: Clips the temporal data to create ranges where the vertrate
+-- was between '[1, 20]'. This vertrate means an aircraft was ascending.
+-- 2. sequenceN: Selects the first sequence from the generated sequences.
+-- This first sequence is takeoff and eliminates mid-flight ascents.
+-- 3. atPeriod: Returns the period of the first sequence.
+flight_traj_time_slice_ascent(icao24, callsign, ascending_trip, ascending_geoaltitude,
+ascending_vertrate) AS
+	(SELECT icao24, callsign,
+		atTime(time_slice_trip, sequenceN(atValues(time_slice_vertrate, floatspan '[1,200]'), 1)::tstzspan),
+		atTime(time_slice_geoaltitude,
+			sequenceN(atValues(time_slice_vertrate, floatspan '[1,20]'),1)::tstzspan),
+		atTime(time_slice_vertrate,
+			sequenceN(atValues(time_slice_vertrate, floatspan '[1,20]'),1)::tstzspan)
+	FROM flight_traj_time_slice),
+-- The final_output CTE uses unnest to unpack the temporal data into rows for
+-- visualization in Grafana. Each row will contain a latitude, longitude and the altitude
+-- and vertrate at those locations.
+final_output AS
+	(SELECT icao24, callsign,
+		getValue(unnest(instants(ascending_geoaltitude))) AS geoaltitude,
+		getValue(unnest(instants(ascending_vertrate))) AS vertrate,
+		ST_X(getValue(unnest(instants(ascending_trip)))) AS lon,
+		ST_Y(getValue(unnest(instants(ascending_trip)))) AS lat
+	FROM flight_traj_time_slice_ascent)
+SELECT *
+FROM final_output
+WHERE vertrate IS NOT NULL
+AND geoaltitude IS NOT NULL;
+            </pre><p>
+                Tips for <span class="strong"><strong>QGIS</strong></span> visualization:
+                QGIS uses geometry points for visualization, so for that in the
+                third CTE you can use trajectory function on ascending_trip and
+                unnest the result.
+            </p><p>
+                We will modify make the follow adjustments for the
+                visualization.
+            </p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+                        Change the visualization type to <span class="quote">“<span class="quote">Geomap</span>”</span>.
+                    </p></li><li class="listitem"><p>
+                        The options (visualization settings - on the right side of
+                        the screen) should be as follows:
+                    </p><p>
+                        <span class="strong"><strong>Panel Options</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Title → Flight Ascent in Time Window
+                            </p></li></ul></div><p>
+                        <span class="strong"><strong>Data Layer:</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Layer type: Markers
+                            </p></li><li class="listitem"><p>
+                                Location: Coords
+                            </p></li><li class="listitem"><p>
+                                Latitude field: lat
+                            </p></li><li class="listitem"><p>
+                                Longitude field: lon
+                            </p></li><li class="listitem"><p>
+                                Styles
+                            </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: circle; "><li class="listitem"><p>
+                                        Size: geoaltitude
+                                    </p></li><li class="listitem"><p>
+                                        Min: 1
+                                    </p></li><li class="listitem"><p>
+                                        Max: 5
+                                    </p></li><li class="listitem"><p>
+                                        Color: vertrate
+                                    </p></li><li class="listitem"><p>
+                                        Fill opacity: 0.5
+                                    </p></li></ul></div></li></ul></div><p>
+                        <span class="strong"><strong>Standard Options:</strong></span>
+                    </p><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Unit: meters/second (m/s)
+                            </p></li><li class="listitem"><p>
+                                Color scheme: Green-Yellow-Red (by value)
+                            </p></li></ul></div></li><li class="listitem"><p>
+                We will also add a manual override (top right of panel options, beside "All") to limit the minimum value of vertrate. This will make all values
+                below the minimum the same color, making larger values more obvious. This can be used to quickly
+                pinpoint locations where a large rate of ascent existed.
+            </p><p>
+                        <span class="strong"><strong>Overrides</strong></span>
+                    </p><div class="itemizedlist"><div class="itemizedlist"><ul class="itemizedlist compact" style="list-style-type: circle; "><li class="listitem"><p>
+                                    Min: 5
+                                </p></li><li class="listitem"><p>
+                                    Max: 20
+                                </p></li></ul></div><ul class="itemizedlist compact" style="list-style-type: disc; "><li class="listitem"><p>
+                                Add field override &gt; Fields with name &gt; vertrate
+                            </p></li></ul></div></li></ol></div><p>
+                Here is a zoomed in version of how each individual flight ascent will look, as well as a view of
+                multiple flights at the same time. The marker size is increasing with altitude, and the color is showing
+                more aggressive vertical ascent rates. We can see towards the end of the visualized ascent period, there
+                is a short increased vertical ascent rate.
+            </p><div class="figure"><a name="idm1318"></a><p class="title"><b>Figure 3.14. Zoomed in view of flight ascent</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="60%"><tr><td><img src="images/ZoomedInViewOfFlightAscent.png" width="100%" alt="Zoomed in view of flight ascent"></td></tr></table></div></div></div><br class="figure-break"><p>
+                The final visualization will look like the below.
+            </p><div class="figure"><a name="idm1326"></a><p class="title"><b>Figure 3.15. Final visualization with multiple flight ascents</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/FinalVisualizationWithMultipleFlightAscents.png" width="100%" alt="Final visualization with multiple flight ascents"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch03s04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch03.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch03s06.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Part 2 - Working with Discrete Points </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Complete Flight Data Business Intelligence Dashboard</td></tr></table></div></body></html>

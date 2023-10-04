@@ -9,10 +9,10 @@
           In the dashboard window, click <span class="quote">“<span class="quote">Dashboard
           settings</span>”</span> icon; the gear symbol, on the
           top-slightly-right of the window.
-        </p><div class="figure"><a name="idm722"></a><p class="title"><b>Figure 2.17. Dashboard settings gear box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/DashboardSettingsGearBox.png" width="100%" alt="Dashboard settings gear box"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+        </p><div class="figure"><a name="idm723"></a><p class="title"><b>Figure 2.17. Dashboard settings gear box</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/DashboardSettingsGearBox.png" width="100%" alt="Dashboard settings gear box"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
           Click on the <span class="quote">“<span class="quote">Variables</span>”</span> in the next window on
           the top-left side of the screen.
-        </p><div class="figure"><a name="idm732"></a><p class="title"><b>Figure 2.18. Selecting Variables in dashboard settings</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="30%"><tr><td><img src="images/SelectingVariablesInDashboardSettings.png" width="100%" alt="Selecting Variables in dashboard settings"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+        </p><div class="figure"><a name="idm733"></a><p class="title"><b>Figure 2.18. Selecting Variables in dashboard settings</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="30%"><tr><td><img src="images/SelectingVariablesInDashboardSettings.png" width="100%" alt="Selecting Variables in dashboard settings"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
           You’ll see a screen that explains the variables in Grafana and
           also points to the
            <a class="ulink" href="https://grafana.com/docs/grafana/latest/variables/" target="_top">Templates
@@ -34,7 +34,7 @@
           drop-down options will look like for the variable you created.
           In this case, we are creating the timestamps in the same
           format that MobilityDB will accept.
-        </p><div class="figure"><a name="idm758"></a><p class="title"><b>Figure 2.19. Creating user-defined list of custom variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/CreatingUserDefinedListOfCustomVariables.png" width="100%" alt="Creating user-defined list of custom variables"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
+        </p><div class="figure"><a name="idm759"></a><p class="title"><b>Figure 2.19. Creating user-defined list of custom variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/CreatingUserDefinedListOfCustomVariables.png" width="100%" alt="Creating user-defined list of custom variables"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
           We can create another variable called <span class="quote">“<span class="quote">ToTime</span>”</span>
           with values shifted 1 hour. So the starting value would be
           <span class="quote">“<span class="quote">2018-01-04 01:00:00</span>”</span> and the final value will be
@@ -96,7 +96,7 @@ GROUP BY P.port_name, P.lat, P.lng
         port Rodby has less activity during this period and that’s why
         it is green now. But overall Rodby has more activity so when we
         look at the entire days data it is colored red.
-      </p><div class="figure"><a name="idm786"></a><p class="title"><b>Figure 2.20. Visualization of geometry intersection using dynamic
+      </p><div class="figure"><a name="idm787"></a><p class="title"><b>Figure 2.20. Visualization of geometry intersection using dynamic
         variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/VisualizationOfGeometryIntersectionUsingDynamicVariables.png" width="100%" alt="Visualization of geometry intersection using dynamic variables"></td></tr></table></div></div></div><br class="figure-break"></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="global-variables"></a>Global Variables</h3></div></div></div><p>
         Grafana also has some
          <a class="ulink" href="https://grafana.com/docs/grafana/latest/variables/variable-types/global-variables/" target="_top">built-in
@@ -106,7 +106,7 @@ GROUP BY P.port_name, P.lat, P.lng
         of the $FromTime and $ToTime we created. The time range can then
         be modified with the time range options in the top right of the
         dashboard.
-      </p><div class="figure"><a name="idm797"></a><p class="title"><b>Figure 2.21. Assigning time range using global variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/AssigningTimeRangeUsingGlobalVariables.png" width="100%" alt="Assigning time range using global variables"></td></tr></table></div></div></div><br class="figure-break"><p>
+      </p><div class="figure"><a name="idm798"></a><p class="title"><b>Figure 2.21. Assigning time range using global variables</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/AssigningTimeRangeUsingGlobalVariables.png" width="100%" alt="Assigning time range using global variables"></td></tr></table></div></div></div><br class="figure-break"><p>
         <span class="emphasis"><em>Note: It is important to be aware of the timezone used
         for the underlying data relative to the queries for global
         variables. Time zones can be adjusted at the bottom of the time

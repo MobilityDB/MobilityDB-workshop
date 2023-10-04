@@ -1,8 +1,8 @@
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Part 3 - Working with Continuous Trajectories in MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch03.html" title="Chapter 3. Managing Flight Data and Creating Dashboard with Grafana"><link rel="prev" href="ch03s04.html" title="Part 2 - Working with Discrete Points"><link rel="next" href="ch03s06.html" title="Complete Flight Data Business Intelligence Dashboard"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part 3 - Working with Continuous Trajectories in MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch03s04.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Managing Flight Data and Creating Dashboard with Grafana</th><td width="20%" align="right"> <a accesskey="n" href="ch03s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm1132"></a>Part 3 - Working with Continuous Trajectories in MobilityDB</h2></div></div></div><p>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Part 3 - Working with Continuous Trajectories in MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch03.html" title="Chapter 3. Managing Flight Data and Creating Dashboard with Grafana"><link rel="prev" href="ch03s04.html" title="Part 2 - Working with Discrete Points"><link rel="next" href="ch03s06.html" title="Complete Flight Data Business Intelligence Dashboard"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part 3 - Working with Continuous Trajectories in MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch03s04.html">Prev</a> </td><th width="60%" align="center">Chapter 3. Managing Flight Data and Creating Dashboard with Grafana</th><td width="20%" align="right"> <a accesskey="n" href="ch03s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm1133"></a>Part 3 - Working with Continuous Trajectories in MobilityDB</h2></div></div></div><p>
             For the following queries, we will make use of trajectories for
             aggregation and creating effective splits in our data based on
             parameters that change in time.
-        </p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1135"></a>Creating MobilityDB Trajectories</h3></div></div></div><p>
+        </p><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1136"></a>Creating MobilityDB Trajectories</h3></div></div></div><p>
                 This step is completed once, only on the ingestion of data. It
                 is shown below to provide an understanding of how to do it. With
                 temporal datatypes and mobilityDB functionality, we can see the
@@ -16,7 +16,7 @@ ALTER TABLE flights
 
 UPDATE flights SET
   geom = ST_SetSRID( ST_MakePoint( lon, lat ), 4326);
-</pre><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1140"></a>AirFrame Trajectories</h4></div></div></div><p>
+</pre><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1141"></a>AirFrame Trajectories</h4></div></div></div><p>
           Now we are ready to construct airframe or airplane
           trajectories out of their individual observations. Each
           <span class="quote">“<span class="quote">icao24</span>”</span> in our dataset represents a single
@@ -78,7 +78,7 @@ GROUP BY icao24;
                             can be manipulated with mobilityDB functionality. The same
                             approach is used for each trajectory, with the function
                             used changing depending on the datatype.
-                        </p></li></ul></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1163"></a>Flight Trajectories</h4></div></div></div><p>
+                        </p></li></ul></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1164"></a>Flight Trajectories</h4></div></div></div><p>
                 Right now we have, in a single row, an airframe’s (where an
                 airframe is a single physical airplane) entire day’s trip
                 information. We would like to segment that information per
@@ -141,10 +141,10 @@ FROM airframe_traj_with_unpacked_callsign;
                 This approach is very generic and can be applied anytime we want
                 to split a trajectory by the inflection points in time of some
                 other trajectory.
-            </p></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1175"></a>Aggregating Flight Statistics</h3></div></div></div><p>
+            </p></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1176"></a>Aggregating Flight Statistics</h3></div></div></div><p>
             We can now use our trajectories to pull flight specific statistics
             very easily.
-        </p><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1178"></a>Average Velocity of Each Flight</h4></div></div></div><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+        </p><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1179"></a>Average Velocity of Each Flight</h4></div></div></div><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
                         In Format as, we have
                         <span class="quote">“<span class="quote">Table</span>”</span>
                     </p><pre class="programlisting">
@@ -178,7 +178,7 @@ ORDER BY twavg(velocity) desc;
                         The settings we adjust improve the visualization by cutting
                         the bar graph values of 0-200, improving the resolution at
                         higher ranges to see differences.
-                    </p><div class="figure"><a name="idm1208"></a><p class="title"><b>Figure 3.10. Average flight speed visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/AverageFlightSpeedVisualization.png" width="100%" alt="Average flight speed visualization"></td></tr></table></div></div></div><br class="figure-break"></li></ol></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1215"></a>Number of Private and Commercial Flights</h4></div></div></div><p>
+                    </p><div class="figure"><a name="idm1209"></a><p class="title"><b>Figure 3.10. Average flight speed visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/AverageFlightSpeedVisualization.png" width="100%" alt="Average flight speed visualization"></td></tr></table></div></div></div><br class="figure-break"></li></ol></div></div><div class="section"><div class="titlepage"><div><div><h4 class="title"><a name="idm1216"></a>Number of Private and Commercial Flights</h4></div></div></div><p>
                 We can easily combine results from multiple queries in the same
                 visualization in Grafana, simplifying the queries themselves.
                 Here we apply some domain knowledge of sport pilot aircraft
@@ -207,7 +207,7 @@ AND (maxValue(geoaltitude) IS NOT NULL
             In Grafana, when we are in the query editor we can click on
             <span class="quote">“<span class="quote">+ Query</span>”</span> at the bottom to add multiple queries
             that provide different results.
-          </p><div class="figure"><a name="idm1225"></a><p class="title"><b>Figure 3.11. Multiple queries providing results for a single
+          </p><div class="figure"><a name="idm1226"></a><p class="title"><b>Figure 3.11. Multiple queries providing results for a single
             visualization</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="90%"><tr><td><img src="images/MultipleQueriesSingleVisualization.png" width="100%" alt="Multiple queries providing results for a single visualization"></td></tr></table></div></div></div><br class="figure-break"></li><li class="listitem"><p>
             Change the visualization type to <span class="quote">“<span class="quote">Stat</span>”</span>.
           </p><p>
@@ -215,11 +215,11 @@ AND (maxValue(geoaltitude) IS NOT NULL
             <span class="quote">“<span class="quote">Overrides</span>”</span> at the top of the options panel on
             the right. Here you can override global panel settings for
             specific attributes as shown below.
-          </p><div class="figure"><a name="idm1237"></a><p class="title"><b>Figure 3.12. Override options for panel with multiple
+          </p><div class="figure"><a name="idm1238"></a><p class="title"><b>Figure 3.12. Override options for panel with multiple
             queries</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="50%"><tr><td><img src="images/OverrideOptionsMultipleQueries.png" width="100%" alt="Override options for panel with multiple queries"></td></tr></table></div></div></div><br class="figure-break"></li></ol></div><p>
         The final statistics visualization will look like this:
-      </p><div class="figure"><a name="idm1245"></a><p class="title"><b>Figure 3.13. Statistic visualization of number of flights by license
-        type</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="30%"><tr><td><img src="images/StatisticVisualizationByFlightType.png" width="100%" alt="Statistic visualization of number of flights by license type"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1252"></a>Flights Taking-off in Some Interval of Time (User-Defined)</h3></div></div></div><p>
+      </p><div class="figure"><a name="idm1246"></a><p class="title"><b>Figure 3.13. Statistic visualization of number of flights by license
+        type</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="30%"><tr><td><img src="images/StatisticVisualizationByFlightType.png" width="100%" alt="Statistic visualization of number of flights by license type"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a name="idm1253"></a>Flights Taking-off in Some Interval of Time (User-Defined)</h3></div></div></div><p>
                 <span class="strong"><strong>Note:</strong></span>
                 This query makes used
                 of a sample set of data that has 200 flights to return results.
@@ -333,6 +333,6 @@ AND geoaltitude IS NOT NULL;
                 multiple flights at the same time. The marker size is increasing with altitude, and the color is showing
                 more aggressive vertical ascent rates. We can see towards the end of the visualized ascent period, there
                 is a short increased vertical ascent rate.
-            </p><div class="figure"><a name="idm1318"></a><p class="title"><b>Figure 3.14. Zoomed in view of flight ascent</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="60%"><tr><td><img src="images/ZoomedInViewOfFlightAscent.png" width="100%" alt="Zoomed in view of flight ascent"></td></tr></table></div></div></div><br class="figure-break"><p>
+            </p><div class="figure"><a name="idm1319"></a><p class="title"><b>Figure 3.14. Zoomed in view of flight ascent</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="60%"><tr><td><img src="images/ZoomedInViewOfFlightAscent.png" width="100%" alt="Zoomed in view of flight ascent"></td></tr></table></div></div></div><br class="figure-break"><p>
                 The final visualization will look like the below.
-            </p><div class="figure"><a name="idm1326"></a><p class="title"><b>Figure 3.15. Final visualization with multiple flight ascents</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/FinalVisualizationWithMultipleFlightAscents.png" width="100%" alt="Final visualization with multiple flight ascents"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch03s04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch03.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch03s06.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Part 2 - Working with Discrete Points </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Complete Flight Data Business Intelligence Dashboard</td></tr></table></div></body></html>
+            </p><div class="figure"><a name="idm1327"></a><p class="title"><b>Figure 3.15. Final visualization with multiple flight ascents</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="70%"><tr><td><img src="images/FinalVisualizationWithMultipleFlightAscents.png" width="100%" alt="Final visualization with multiple flight ascents"></td></tr></table></div></div></div><br class="figure-break"></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch03s04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch03.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch03s06.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Part 2 - Working with Discrete Points </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Complete Flight Data Business Intelligence Dashboard</td></tr></table></div></body></html>

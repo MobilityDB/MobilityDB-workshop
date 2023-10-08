@@ -57,4 +57,4 @@ RUN cd /Workshop && \
 RUN rm /docker-entrypoint-initdb.d/10_postgis.sh
 COPY ./docker/initdb-mobilitydb.sh /docker-entrypoint-initdb.d/mobilitydb.sh
 RUN chmod +x /docker-entrypoint-initdb.d/mobilitydb.sh
-RUN chmod a+r /workshop/*
+RUN chmod a+r /Workshop/*

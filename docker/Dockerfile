@@ -23,6 +23,7 @@ RUN apt-get update \
     libproj-dev \
     g++ \
     wget \
+    unzip \
     autoconf \
     autotools-dev \
     libgeos-dev \

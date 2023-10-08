@@ -56,7 +56,10 @@ RUN cd /usr/local/src/MobilityDB/build && \
 RUN mkdir /workshop
 RUN cd /workshop && \
     wget https://raw.githubusercontent.com/MobilityDB/MobilityDB-workshop/master/data/gtfs_data.zip && \
-    unzip gtfs_data.zip -d gtfs_data    
+    wget https://raw.githubusercontent.com/MobilityDB/MobilityDB-workshop/master/data/ais_data.zip && \
+    unzip gtfs_data.zip -d gtfs_data && \
+    unzip ais_data.zip -d ais_data && \   
+    rm -f ais_data.zip gtfs_data.zip
 
 RUN rm /docker-entrypoint-initdb.d/10_postgis.sh
 COPY ./docker/initdb-mobilitydb.sh /docker-entrypoint-initdb.d/mobilitydb.sh

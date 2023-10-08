@@ -52,6 +52,12 @@ RUN cd /usr/local/src/MobilityDB/build && \
     make -j$(nproc) && \
     make install
 
+# Workshop Data
+RUN mkdir /workshop
+RUN cd /workshop && \
+    wget https://github.com/MobilityDB/MobilityDB-workshop/blob/master/data/gtfs_data.zip && \
+    unzip gtfs_data.zip -d gtfs_data    
+
 RUN rm /docker-entrypoint-initdb.d/10_postgis.sh
 COPY ./docker/initdb-mobilitydb.sh /docker-entrypoint-initdb.d/mobilitydb.sh
 RUN chmod +x /docker-entrypoint-initdb.d/mobilitydb.sh

@@ -55,7 +55,7 @@ RUN cd /usr/local/src/MobilityDB/build && \
 # Workshop Data
 RUN mkdir /workshop
 RUN cd /workshop && \
-    wget https://github.com/MobilityDB/MobilityDB-workshop/blob/master/data/gtfs_data.zip && \
+    wget https://raw.githubusercontent.com/MobilityDB/MobilityDB-workshop/master/data/gtfs_data.zip && \
     unzip gtfs_data.zip -d gtfs_data    
 
 RUN rm /docker-entrypoint-initdb.d/10_postgis.sh

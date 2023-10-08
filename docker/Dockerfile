@@ -38,23 +38,16 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Install MobilityDB
-RUN wget -O MobilityDB.tar.gz "https://github.com/MobilityDB/MobilityDB/archive/v1.0.tar.gz" \
- && mkdir -p /usr/local/src/MobilityDB \
- && tar \
-        --extract \
-        --file MobilityDB.tar.gz \
-        --directory /usr/local/src/MobilityDB \
-        --strip-components 1 \
- && rm MobilityDB.tar.gz
-RUN mkdir /usr/local/src/MobilityDB/build
-RUN cd /usr/local/src/MobilityDB/build && \
+RUN git clone https://github.com/MobilityDB/MobilityDB.git -b develop /usr/local/src/MobilityDB && \
+    mkdir -p /usr/local/src/MobilityDB/build && \
+    cd /usr/local/src/MobilityDB/build && \
     cmake .. && \
     make -j$(nproc) && \
     make install
 
 # Workshop Data
-RUN mkdir /workshop
-RUN cd /workshop && \
+RUN mkdir /Workshop
+RUN cd /Workshop && \
     wget https://raw.githubusercontent.com/MobilityDB/MobilityDB-workshop/master/data/gtfs_data.zip && \
     wget https://raw.githubusercontent.com/MobilityDB/MobilityDB-workshop/master/data/ais_data.zip && \
     unzip gtfs_data.zip -d gtfs_data && \

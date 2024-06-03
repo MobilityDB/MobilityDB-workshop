@@ -182,7 +182,7 @@ FROM trips_input
 GROUP BY trip_id, service_id, route_id, date;
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
-SELECT trip_id, route_id, t.service_id, d.date,
+SELECT trip_id, t.service_id, route_id, d.date,
   shift(trip, make_interval(days =&gt; d.date - t.date))
 FROM trips_mdb t JOIN service_dates d ON t.service_id = d.service_id AND t.date &lt;&gt; d.date;
 			</pre><p>

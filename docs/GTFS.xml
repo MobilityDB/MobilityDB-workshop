@@ -26,10 +26,6 @@
 				</listitem>
 
 				<listitem>
-					<para><varname>route_types.txt</varname> contains transportation types used on routes, such as bus, metro, tramway, etc.</para>
-				</listitem>
-
-				<listitem>
 					<para><varname>routes.txt</varname> contains transit routes. A route is a group of trips that are displayed to riders as a single service.</para>
 				</listitem>
 
@@ -85,7 +81,6 @@ CREATE TABLE calendar (
   end_date date NOT NULL,
   CONSTRAINT calendar_pkey PRIMARY KEY (service_id)
 );
-CREATE INDEX calendar_service_id ON calendar (service_id);
 
 CREATE TABLE exception_types (
   exception_type int PRIMARY KEY,
@@ -97,19 +92,14 @@ CREATE TABLE calendar_dates (
   date date NOT NULL,
   exception_type int REFERENCES exception_types(exception_type)
 );
-CREATE INDEX calendar_dates_dateidx ON calendar_dates (date);
-
-CREATE TABLE route_types (
-  route_type int PRIMARY KEY,
-  description text
-);
+CREATE INDEX calendar_dates_date_idx ON calendar_dates (date);
 
 CREATE TABLE routes (
   route_id text,
   route_short_name text DEFAULT '',
   route_long_name text DEFAULT '',
   route_desc text DEFAULT '',
-  route_type int REFERENCES route_types(route_type),
+  route_type int,
   route_url text,
   route_color text,
   route_text_color text,
@@ -122,15 +112,14 @@ CREATE TABLE shapes (
   shape_pt_lon double precision NOT NULL,
   shape_pt_sequence int NOT NULL
 );
-CREATE INDEX shapes_shape_key ON shapes (shape_id);
+CREATE INDEX shapes_shape_id_idx ON shapes (shape_id);
 
 -- Create a table to store the shape geometries
 CREATE TABLE shape_geoms (
   shape_id text NOT NULL,
-  shape_geom geometry('LINESTRING', 4326),
+  shape_geom geometry('LINESTRING', 3857),
   CONSTRAINT shape_geom_pkey PRIMARY KEY (shape_id)
 );
-CREATE INDEX shape_geoms_key ON shapes (shape_id);
 
 CREATE TABLE location_types (
   location_type int PRIMARY KEY,
@@ -146,9 +135,9 @@ CREATE TABLE stops (
   stop_lon double precision,
   zone_id text,
   stop_url text,
-  location_type integer  REFERENCES location_types(location_type),
+  location_type integer REFERENCES location_types(location_type),
   parent_station integer,
-  stop_geom geometry('POINT', 4326),
+  stop_geom geometry('POINT', 3857),
   platform_code text DEFAULT NULL,
   CONSTRAINT stops_pkey PRIMARY KEY (stop_id)
 );
@@ -160,7 +149,7 @@ CREATE TABLE pickup_dropoff_types (
 
 CREATE TABLE stop_times (
   trip_id text NOT NULL,
-  -- Check that casting to time interval works.
+  -- Check that casting to time interval works
   arrival_time interval CHECK (arrival_time::interval = arrival_time::interval),
   departure_time interval CHECK (departure_time::interval = departure_time::interval),
   stop_id text,
@@ -183,7 +172,6 @@ CREATE TABLE trips (
   shape_id text,
   CONSTRAINT trips_pkey PRIMARY KEY (trip_id)
 );
-CREATE INDEX trips_trip_id ON trips (trip_id);
 
 INSERT INTO exception_types (exception_type, description) VALUES
 (1, 'service has been added'),
@@ -218,8 +206,6 @@ COPY trips(route_id,service_id,trip_id,trip_headsign,direction_id,block_id,shape
 FROM '/home/gtfs_tutorial/trips.txt' DELIMITER ',' CSV HEADER;
 COPY agency(agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone)
 FROM '/home/gtfs_tutorial/agency.txt' DELIMITER ',' CSV HEADER;
-COPY route_types(route_type,description)
-FROM '/home/gtfs_tutorial/route_types.txt' DELIMITER ',' CSV HEADER;
 COPY routes(route_id,route_short_name,route_long_name,route_desc,route_type,route_url,
 route_color,route_text_color) FROM '/home/gtfs_tutorial/routes.txt' DELIMITER ','
 CSV HEADER;
@@ -233,12 +219,12 @@ CSV HEADER;
 			<programlisting language="sql">
 INSERT INTO shape_geoms
 SELECT shape_id, ST_MakeLine(array_agg(
-  ST_SetSRID(ST_MakePoint(shape_pt_lon, shape_pt_lat),4326) ORDER BY shape_pt_sequence))
+  ST_Transform(ST_Point(shape_pt_lon, shape_pt_lat, 4326), 3857) ORDER BY shape_pt_sequence))
 FROM shapes
 GROUP BY shape_id;
 
 UPDATE stops
-SET stop_geom = ST_SetSRID(ST_MakePoint(stop_lon, stop_lat),4326);
+SET stop_geom = ST_Transform(ST_Point(stop_lon, stop_lat, 4326), 3857);
 			</programlisting>
 			The visualization of the routes and stops in QGIS is given in <xref linkend="stib" />. In the figure, red lines correspond to the trajectories of vehicles, while orange points correspond to the location of stops.
 		</para>
@@ -253,20 +239,20 @@ SET stop_geom = ST_SetSRID(ST_MakePoint(stop_lon, stop_lat),4326);
 	<sect1>
 		<title>Transforming GTFS Data for MobilityDB</title>
 		<para>
-			We start by creating a table that contains couples of <varname>service_id</varname> and <varname>date</varname> defining the dates at which a  service is provided.
+			We start by creating a table that contains couples of <varname>service_id</varname> and <varname>date</varname> defining the dates at which a service is provided.
 			<programlisting language="sql">
 DROP TABLE IF EXISTS service_dates;
 CREATE TABLE service_dates AS (
 SELECT service_id, date_trunc('day', d)::date AS date
 FROM calendar c, generate_series(start_date, end_date, '1 day'::interval) AS d
 WHERE (
-	(monday = 1 AND extract(isodow FROM d) = 1) OR
-	(tuesday = 1 AND extract(isodow FROM d) = 2) OR
-	(wednesday = 1 AND extract(isodow FROM d) = 3) OR
-	(thursday = 1 AND extract(isodow FROM d) = 4) OR
-	(friday = 1 AND extract(isodow FROM d) = 5) OR
-	(saturday = 1 AND extract(isodow FROM d) = 6) OR
-	(sunday = 1 AND extract(isodow FROM d) = 7)
+  (monday = 1 AND extract(isodow FROM d) = 1) OR
+  (tuesday = 1 AND extract(isodow FROM d) = 2) OR
+  (wednesday = 1 AND extract(isodow FROM d) = 3) OR
+  (thursday = 1 AND extract(isodow FROM d) = 4) OR
+  (friday = 1 AND extract(isodow FROM d) = 5) OR
+  (saturday = 1 AND extract(isodow FROM d) = 6) OR
+  (sunday = 1 AND extract(isodow FROM d) = 7)
 )
 EXCEPT
 SELECT service_id, date
@@ -304,8 +290,8 @@ FROM trips t JOIN stop_times s ON t.trip_id = s.trip_id;
 
 UPDATE trip_stops t
 SET perc = CASE
-WHEN stop_sequence =  1 then 0.0
-WHEN stop_sequence =  no_stops then 1.0
+WHEN stop_sequence = 1 THEN 0.0
+WHEN stop_sequence = no_stops THEN 1.0
 ELSE ST_LineLocatePoint(g.shape_geom, s.stop_geom)
 END
 FROM shape_geoms g, stops s
@@ -441,7 +427,8 @@ CREATE TABLE trips_mdb (
 );
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
-SELECT trip_id, service_id, route_id, date, tgeompoint_seq(array_agg(tgeompoint_inst(point_geom, t) ORDER BY T))
+SELECT trip_id, service_id, route_id, date, tgeompointSeq(array_agg(
+  tgeompoint(point_geom, t) ORDER BY T))
 FROM trips_input
 GROUP BY trip_id, service_id, route_id, date;
 

@@ -1,18 +1,18 @@
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Transforming GTFS Data for MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="prev" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="next" href="ch05.html" title="Chapter 5. Managing Google Location History"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Transforming GTFS Data for MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04.html">Prev</a> </td><th width="60%" align="center">Chapter 4. Managing GTFS Data</th><td width="20%" align="right"> <a accesskey="n" href="ch05.html">Next</a></td></tr></table><hr></div><div class="sect1"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm1409"></a>Transforming GTFS Data for MobilityDB</h2></div></div></div><p>
-			We start by creating a table that contains couples of <code class="varname">service_id</code> and <code class="varname">date</code> defining the dates at which a  service is provided.
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Transforming GTFS Data for MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="prev" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="next" href="ch05.html" title="Chapter 5. Managing Google Location History"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Transforming GTFS Data for MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04.html">Prev</a> </td><th width="60%" align="center">Chapter 4. Managing GTFS Data</th><td width="20%" align="right"> <a accesskey="n" href="ch05.html">Next</a></td></tr></table><hr></div><div class="sect1"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm1406"></a>Transforming GTFS Data for MobilityDB</h2></div></div></div><p>
+			We start by creating a table that contains couples of <code class="varname">service_id</code> and <code class="varname">date</code> defining the dates at which a service is provided.
 			</p><pre class="programlisting">
 DROP TABLE IF EXISTS service_dates;
 CREATE TABLE service_dates AS (
 SELECT service_id, date_trunc('day', d)::date AS date
 FROM calendar c, generate_series(start_date, end_date, '1 day'::interval) AS d
 WHERE (
-	(monday = 1 AND extract(isodow FROM d) = 1) OR
-	(tuesday = 1 AND extract(isodow FROM d) = 2) OR
-	(wednesday = 1 AND extract(isodow FROM d) = 3) OR
-	(thursday = 1 AND extract(isodow FROM d) = 4) OR
-	(friday = 1 AND extract(isodow FROM d) = 5) OR
-	(saturday = 1 AND extract(isodow FROM d) = 6) OR
-	(sunday = 1 AND extract(isodow FROM d) = 7)
+  (monday = 1 AND extract(isodow FROM d) = 1) OR
+  (tuesday = 1 AND extract(isodow FROM d) = 2) OR
+  (wednesday = 1 AND extract(isodow FROM d) = 3) OR
+  (thursday = 1 AND extract(isodow FROM d) = 4) OR
+  (friday = 1 AND extract(isodow FROM d) = 5) OR
+  (saturday = 1 AND extract(isodow FROM d) = 6) OR
+  (sunday = 1 AND extract(isodow FROM d) = 7)
 )
 EXCEPT
 SELECT service_id, date
@@ -48,8 +48,8 @@ FROM trips t JOIN stop_times s ON t.trip_id = s.trip_id;
 
 UPDATE trip_stops t
 SET perc = CASE
-WHEN stop_sequence =  1 then 0.0
-WHEN stop_sequence =  no_stops then 1.0
+WHEN stop_sequence = 1 THEN 0.0
+WHEN stop_sequence = no_stops THEN 1.0
 ELSE ST_LineLocatePoint(g.shape_geom, s.stop_geom)
 END
 FROM shape_geoms g, stops s
@@ -177,7 +177,8 @@ CREATE TABLE trips_mdb (
 );
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
-SELECT trip_id, service_id, route_id, date, tgeompoint_seq(array_agg(tgeompoint_inst(point_geom, t) ORDER BY T))
+SELECT trip_id, service_id, route_id, date, tgeompointSeq(array_agg(
+  tgeompoint(point_geom, t) ORDER BY T))
 FROM trips_input
 GROUP BY trip_id, service_id, route_id, date;
 

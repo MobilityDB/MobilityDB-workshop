@@ -60,7 +60,8 @@ CREATE TABLE shapes (
   shape_id text NOT NULL,
   shape_pt_lat double precision NOT NULL,
   shape_pt_lon double precision NOT NULL,
-  shape_pt_sequence int NOT NULL
+  shape_pt_sequence int NOT NULL,
+  shape_dist_traveled float NOT NULL
 );
 CREATE INDEX shapes_shape_id_idx ON shapes (shape_id);
 

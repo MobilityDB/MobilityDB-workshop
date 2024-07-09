@@ -83,8 +83,8 @@ INSERT INTO trip_segs (trip_id, route_id, service_id, stop1_sequence, stop2_sequ
 WITH temp AS (
   SELECT trip_id, route_id, service_id, stop_sequence,
     LEAD(stop_sequence) OVER w AS stop_sequence2,
-  MAX(stop_sequence) OVER (PARTITION BY trip_id),
-  shape_id, arrival_time, LEAD(arrival_time) OVER w, perc, LEAD(perc) OVER w
+    MAX(stop_sequence) OVER (PARTITION BY trip_id),
+    shape_id, arrival_time, LEAD(arrival_time) OVER w, perc, LEAD(perc) OVER w
   FROM trip_stops WINDOW w AS (PARTITION BY trip_id ORDER BY stop_sequence)
 )
 SELECT * FROM temp WHERE stop_sequence2 IS NOT null;

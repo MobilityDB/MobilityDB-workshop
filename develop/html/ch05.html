@@ -73,7 +73,7 @@ CREATE TABLE locations_mdb (
 );
 
 INSERT INTO locations_mdb(date, trip)
-SELECT date, tgeompoint_seq(array_agg(tgeompoint_inst(
+SELECT date, tgeompointSeq(array_agg(tgeompoint(
 	ST_SetSRID(ST_Point(longitudeE7/1e7, latitudeE7/1e7),4326),
 	to_timestamp(timestampMs / 1000.0)::timestamptz) ORDER BY timestampMs))
 FROM location_history

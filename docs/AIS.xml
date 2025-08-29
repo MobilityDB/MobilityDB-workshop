@@ -210,9 +210,9 @@ SELECT COUNT(*) FROM AISInputFiltered;
 				<programlisting language="sql" xml:space="preserve">
 CREATE TABLE Ships(MMSI, Trip, SOG, COG) AS 
 SELECT MMSI, 
-  tgeompoint_seq(array_agg(tgeompoint_inst(ST_Transform(Geom, 25832), T) ORDER BY T)), 
-  tfloat_seq(array_agg(tfloat_inst(SOG, T) ORDER BY T) FILTER (WHERE SOG IS NOT NULL)), 
-  tfloat_seq(array_agg(tfloat_inst(COG, T) ORDER BY T) FILTER (WHERE COG IS NOT NULL)) 
+  tgeompointSeq(array_agg(tgeompoint(ST_Transform(Geom, 25832), T) ORDER BY T)), 
+  tfloatSeq(array_agg(tfloat(SOG, T) ORDER BY T) FILTER (WHERE SOG IS NOT NULL)), 
+  tfloatSeq(array_agg(tfloat(COG, T) ORDER BY T) FILTER (WHERE COG IS NOT NULL)) 
 FROM AISInputFiltered 
 GROUP BY MMSI;
 -- Query returned successfully: 6264 rows affected, 00:52 minutes execution time.

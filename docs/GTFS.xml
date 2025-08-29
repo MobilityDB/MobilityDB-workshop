@@ -441,7 +441,7 @@ CREATE TABLE trips_mdb (
 );
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
-SELECT trip_id, service_id, route_id, date, tgeompoint_seq(array_agg(tgeompoint_inst(point_geom, t) ORDER BY T))
+SELECT trip_id, service_id, route_id, date, tgeompointSeq(array_agg(tgeompoint(point_geom, t) ORDER BY T))
 FROM trips_input
 GROUP BY trip_id, service_id, route_id, date;
 

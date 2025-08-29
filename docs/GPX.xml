@@ -121,7 +121,7 @@ CREATE TABLE trips_mdb (
 );
 
 INSERT INTO trips_mdb(date, trip)
-SELECT date, tgeompoint_seq(array_agg(tgeompoint_inst(
+SELECT date, tgeompointSeq(array_agg(tgeompoint(
   ST_SetSRID(ST_Point(lon, lat), 4326), time) ORDER BY time))
 FROM trips_input
 GROUP BY date;

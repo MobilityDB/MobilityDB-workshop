@@ -850,19 +850,19 @@ CREATE INDEX icao24_time_index
 CREATE TABLE airframe_traj(icao24, trip, velocity, heading, vertrate, callsign, squawk,
                            geoaltitude) AS
 SELECT icao24,
-       tgeompoint_seq(array_agg(tgeompoint_inst(geom, et_ts) ORDER BY et_ts)
+       tgeompointSeq(array_agg(tgeompoint(geom, et_ts) ORDER BY et_ts)
                       FILTER (WHERE geom IS NOT NULL)),
-       tfloat_seq(array_agg(tfloat_inst(velocity, et_ts) ORDER BY et_ts)
+       tfloatSeq(array_agg(tfloat(velocity, et_ts) ORDER BY et_ts)
                   FILTER (WHERE velocity IS NOT NULL)),
-       tfloat_seq(array_agg(tfloat_inst(heading, et_ts) ORDER BY et_ts)
+       tfloatSeq(array_agg(tfloat(heading, et_ts) ORDER BY et_ts)
                   FILTER (WHERE heading IS NOT NULL)),
-       tfloat_seq(array_agg(tfloat_inst(vertrate, et_ts) ORDER BY et_ts)
+       tfloatSeq(array_agg(tfloat(vertrate, et_ts) ORDER BY et_ts)
                   FILTER (WHERE vertrate IS NOT NULL)),
-       ttext_seq(array_agg(ttext_inst(callsign, et_ts) ORDER BY et_ts)
+       ttextSeq(array_agg(ttext(callsign, et_ts) ORDER BY et_ts)
                  FILTER (WHERE callsign IS NOT NULL)),
-       tint_seq(array_agg(tint_inst(squawk, et_ts) ORDER BY et_ts)
+       tintSeq(array_agg(tint(squawk, et_ts) ORDER BY et_ts)
                 FILTER (WHERE squawk IS NOT NULL)),
-       tfloat_seq(array_agg(tfloat_inst(geoaltitude, et_ts) ORDER BY et_ts)
+       tfloatSeq(array_agg(tfloat(geoaltitude, et_ts) ORDER BY et_ts)
                   FILTER (WHERE geoaltitude IS NOT NULL))
 FROM flights
 GROUP BY icao24;
@@ -876,7 +876,7 @@ GROUP BY icao24;
                 <itemizedlist spacing="compact">
                     <listitem>
                         <para>
-                            tgeompoint_inst: combines each geometry point(lat, long)
+                            tgeompoint: combines each geometry point(lat, long)
                             with the timestamp where that point existed
                         </para>
                     </listitem>
@@ -889,7 +889,7 @@ GROUP BY icao24;
                     </listitem>
                     <listitem>
                         <para>
-                            tgeompoint_seq: constructs the array as a sequence which
+                            tgeompointSeq: constructs the array as a sequence which
                             can be manipulated with mobilityDB functionality. The same
                             approach is used for each trajectory, with the function
                             used changing depending on the datatype.

@@ -3,11 +3,19 @@ on:
   push:
     branches:
       - '*'
+    paths:
+      - 'docker/**'
+      - 'data/**'
+      - '.github/workflows/docker-image.yaml'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
     branches:
       - '*'
+    paths:
+      - 'docker/**'
+      - 'data/**'
+      - '.github/workflows/docker-image.yaml'
 jobs:
   build:
     name: Build & push docker image
@@ -16,26 +24,22 @@ jobs:
     strategy:
         fail-fast: false
         matrix:
-          psql: [15]
-          postgis: [3.4]
+          psql: [18]
+          postgis: [3.6]
+          mobilitydb: [1.3]
           os: [ubuntu-latest]
 
     env:
       IMG_NAME: ${{ github.repository }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4
 
       - name: Info
         run: echo "Parameters. ${{ github.event.base_ref }}, ${{ github.ref_type }}, ${{ github.ref }}"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -46,11 +50,11 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          platforms: linux/amd64,linux/arm64
           context: .
           file: ./docker/Dockerfile
           push: true
-          tags: mobilitydb/mobilitydb:${{ matrix.psql }}-${{ matrix.postgis }}-1.1-workshop
+          tags: mobilitydb/mobilitydb:${{ matrix.psql }}-${{ matrix.postgis }}-${{ matrix.mobilitydb }}-workshop
           build-args: |
             POSTGRES_VERSION=${{ matrix.psql }}
             POSTGIS_VERSION=${{ matrix.postgis }}
+            MOBILITYDB_VERSION=${{ matrix.mobilitydb }}

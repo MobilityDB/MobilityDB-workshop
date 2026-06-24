@@ -424,7 +424,7 @@ FROM trip_points t JOIN
 ( SELECT service_id, MIN(date) AS date FROM service_dates GROUP BY service_id) s
 ON t.service_id = s.service_id;
 			</programlisting>
-			In the inner query of the <varname>INSERT</varname> statement, we select the first date of a service in the <varname>service_dates</varname> table and then we join the resulting table with the <varname>trip_points</varname> table to compute the arrival time at each point composing the trips. Notice that we filter the first date of each trip for optimization purposes because in the next step below we use the <varname>shift</varname> function to compute the trips to all other dates. Alternatively, we could join the two tables but this will be considerably slower for big GTFS files.
+			In the inner query of the <varname>INSERT</varname> statement, we select the first date of a service in the <varname>service_dates</varname> table and then we join the resulting table with the <varname>trip_points</varname> table to compute the arrival time at each point composing the trips. Notice that we filter the first date of each trip for optimization purposes because in the next step below we use the <varname>shiftTime</varname> function to compute the trips to all other dates. Alternatively, we could join the two tables but this will be considerably slower for big GTFS files.
 		</para>
 
 		<para>
@@ -447,10 +447,10 @@ GROUP BY trip_id, service_id, route_id, date;
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
 SELECT trip_id, t.service_id, route_id, d.date,
-  shift(trip, make_interval(days => d.date - t.date))
+  shiftTime(trip, make_interval(days => d.date - t.date))
 FROM trips_mdb t JOIN service_dates d ON t.service_id = d.service_id AND t.date &lt;&gt; d.date;
 			</programlisting>
-			In the first <varname>INSERT</varname> statement we group the rows in the <varname>trips_input</varname> table by <varname>trip_id</varname> and <varname>date</varname> while keeping the <varname>route_id</varname> atribute, use the <varname>array_agg</varname> function to construct an array containing the temporal points composing the trip ordered by time, and compute the trip from this array using the function <varname>tgeompointseq</varname>. As explained above, table <varname>trips_input</varname> only contains the first date of a trip. In the second <varname>INSERT</varname> statement we add the trips for all the other dates with the function <varname>shift</varname>.
+			In the first <varname>INSERT</varname> statement we group the rows in the <varname>trips_input</varname> table by <varname>trip_id</varname> and <varname>date</varname> while keeping the <varname>route_id</varname> atribute, use the <varname>array_agg</varname> function to construct an array containing the temporal points composing the trip ordered by time, and compute the trip from this array using the function <varname>tgeompointSeq</varname>. As explained above, table <varname>trips_input</varname> only contains the first date of a trip. In the second <varname>INSERT</varname> statement we add the trips for all the other dates with the function <varname>shiftTime</varname>.
 		</para>
 	</sect1>
 

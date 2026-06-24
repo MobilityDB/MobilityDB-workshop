@@ -304,9 +304,9 @@ WHERE length(Trip) = 0 OR length(Trip) >= 1500000;
 			<para>
 				Let's have a look at the speed of the ships. There are two speed values in the data; the speed calculated from the spatiotemporal trajectory <varname>speed(Trip)</varname>, and the <varname>SOG</varname> attribute. Optimally, the two will be the same. A small variance would still be OK, because of sensor errors. Note that both are temporal floats. In the next query, we compare the averages of the two speed values for every ship:
 				<programlisting language="sql" xml:space="preserve">
-SELECT ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) SpeedDifference
+SELECT ABS(twAvg(SOG) * 1.852 - twAvg(speed(Trip))* 3.6 ) SpeedDifference
 FROM Ships WHERE SOG IS NOT NULL AND
-  ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) > 10.0
+  ABS(twAvg(SOG) * 1.852 - twAvg(speed(Trip))* 3.6 ) > 10.0
 ORDER BY SpeedDifference DESC;
 
   speeddifference
@@ -325,13 +325,13 @@ ORDER BY SpeedDifference DESC;
 </programlisting>
 			</para>
 			<para>
-				The <varname>twavg</varname> computes a time-weighted average of a temporal float. It basically computes the area under the curve, then divides it by the time duration of the temporal float. By doing so, the speed values that remain for longer durations affect the average more than those that remain for shorter durations. Note that SOG is in knot, and Speed(Trip) is in m/s. The query converts both to km/h.
+				The <varname>twAvg</varname> computes a time-weighted average of a temporal float. It basically computes the area under the curve, then divides it by the time duration of the temporal float. By doing so, the speed values that remain for longer durations affect the average more than those that remain for shorter durations. Note that SOG is in knot, and Speed(Trip) is in m/s. The query converts both to km/h.
 			</para>
 			<para>
 				The query shows the first 10 ship trajectories of the 82 in the table that have a difference of more than 10 km/h. These trajectories are shown in <xref linkend="imgtrajsWrongSpeed"/>. Again they look like noise, so we remove them with the following query
 				<programlisting language="sql" xml:space="preserve">
 DELETE FROM Ships 
-WHERE ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) > 10;
+WHERE ABS(twAvg(SOG) * 1.852 - twAvg(speed(Trip))* 3.6 ) > 10;
 </programlisting>
 			</para>
 			<figure id="imgtrajsWrongSpeed" float="start"><title>Ship trajectories with big difference between <varname>speed(Trip)</varname> and <varname>SOG</varname></title>
@@ -342,9 +342,9 @@ WHERE ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) > 10;
 			<para>
 				Now we do a similar comparison between the calculated azimuth from the spatiotemporal trajectory, and the attribute COG:
 				<programlisting language="sql" xml:space="preserve">
-SELECT ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) AzimuthDifference 
+SELECT ABS(twAvg(COG) - twAvg(azimuth(Trip)) * 180.0/pi()) AzimuthDifference 
 FROM Ships 
-WHERE ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) > 45.0 
+WHERE ABS(twAvg(COG) - twAvg(azimuth(Trip)) * 180.0/pi()) > 45.0 
 ORDER BY AzimuthDifference DESC;
 
  azimuthdifference
@@ -386,7 +386,7 @@ WITH Ports(Rodby, Puttgarden) AS (
     ST_MakeEnvelope(644339, 6042108, 644896, 6042487, 25832) )
 SELECT S.*, Rodby, Puttgarden
 FROM Ports P, Ships S
-WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden);
+WHERE eIntersects(S.Trip, P.Rodby) AND eIntersects(S.Trip, P.Puttgarden);
 -- Total query runtime: 462 msec
 -- 4 rows retrieved.
 </programlisting>
@@ -402,7 +402,7 @@ WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden);
 				</mediaobject>
 			</figure>
 			<para>
-				This query creates two envelope geometries that represent the locations of the two ports, then intersects them with the spatiotemporal trajectories of the ships. The <varname>eintersects</varname> function checks whether a temporal point ever intersects a geometry. To speed up the query, a spatiotemporal GiST index is first built on the <varname>Trip</varname> attribute. The query identified four Ships that commuted between the two ports, <xref linkend="imgtrajFerries"/>. To count how many one way trips each of them did, we extend the previous query as follows:
+				This query creates two envelope geometries that represent the locations of the two ports, then intersects them with the spatiotemporal trajectories of the ships. The <varname>eIntersects</varname> function checks whether a temporal point ever intersects a geometry. To speed up the query, a spatiotemporal GiST index is first built on the <varname>Trip</varname> attribute. The query identified four Ships that commuted between the two ports, <xref linkend="imgtrajFerries"/>. To count how many one way trips each of them did, we extend the previous query as follows:
 				<programlisting language="sql" xml:space="preserve">
 WITH Ports(Rodby, Puttgarden) AS (
   SELECT ST_MakeEnvelope(651135, 6058230, 651422, 6058548, 25832),
@@ -410,7 +410,7 @@ WITH Ports(Rodby, Puttgarden) AS (
 SELECT MMSI, (numSequences(atGeometry(S.Trip, P.Rodby)) +
   numSequences(atGeometry(S.Trip, P.Puttgarden)))/2.0 AS NumTrips
 FROM Ports P, Ships S
-WHERE eintersects(S.Trip, P.Rodby) AND eintersects(S.Trip, P.Puttgarden);
+WHERE eIntersects(S.Trip, P.Rodby) AND eIntersects(S.Trip, P.Puttgarden);
 
    mmsi    |      numtrips
 -----------+---------------------
@@ -435,16 +435,16 @@ BeltShips AS (
   SELECT MMSI, atGeometry(S.Trip, B.Belt) AS Trip,
     trajectory(atGeometry(S.Trip, B.Belt)) AS Traj
   FROM Ships S, B
-  WHERE eintersects(S.Trip, B.Belt) )
+  WHERE eIntersects(S.Trip, B.Belt) )
 SELECT S1.MMSI, S2.MMSI, S1.Traj, S2.Traj, shortestLine(S1.trip, S2.trip) Approach
 FROM BeltShips S1, BeltShips S2
-WHERE S1.MMSI > S2.MMSI AND edwithin(S1.trip, S2.trip, 300);
+WHERE S1.MMSI > S2.MMSI AND eDwithin(S1.trip, S2.trip, 300);
 -- Total query runtime: 28.5 secs
 -- 7 rows retrieved.
 </programlisting>
 			</para>
 			<para>
-				The query first defines the area of interest as an envelope, the red dashed line in <xref linkend="imgtrajApproach"/>). It then restricts/crops the trajectories to only this envelope using the <varname>atGeometry</varname> function. The main query then find pairs of different trajectories that ever came within a distance of 300 meters to one another (the <varname>dwithin</varname>). For these trajectories, it computes the spatial line that connects the two instants where the two trajectories were closest to one another (the <varname>shortestLine</varname> function). <xref linkend="imgtrajApproach"/> shows the green trajectories that came close to the blue trajectories, and their shortest connecting line in solid red. Most of the approaches occur at the entrance of the R&oslash;dby port, which looks normal. But we also see two interesting approaches, that may indicate danger of collision away from the port. They are shown with more zoom in <xref linkend="imgApproach1"/> and <xref linkend="imgApproach2"/>
+				The query first defines the area of interest as an envelope, the red dashed line in <xref linkend="imgtrajApproach"/>). It then restricts/crops the trajectories to only this envelope using the <varname>atGeometry</varname> function. The main query then find pairs of different trajectories that ever came within a distance of 300 meters to one another (the <varname>eDwithin</varname>). For these trajectories, it computes the spatial line that connects the two instants where the two trajectories were closest to one another (the <varname>shortestLine</varname> function). <xref linkend="imgtrajApproach"/> shows the green trajectories that came close to the blue trajectories, and their shortest connecting line in solid red. Most of the approaches occur at the entrance of the R&oslash;dby port, which looks normal. But we also see two interesting approaches, that may indicate danger of collision away from the port. They are shown with more zoom in <xref linkend="imgApproach1"/> and <xref linkend="imgApproach2"/>
 			</para>
 			<figure id="imgtrajApproach" float="start"><title>Ship that come closer than 300 meters to one another</title>
 				<mediaobject>

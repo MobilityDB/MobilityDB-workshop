@@ -960,6 +960,16 @@ WHERE (maxValue(velocity) IS NOT NULL
 			In order to make the query use Grafana global time range panel replace the hard-coded timestamps with <literal>[${__from:date}, ${__to:date})</literal>.
 			</para>
 
+			<para>
+				We first create the sample table as a random subset of 200 trajectories from <varname>flight_traj</varname>.
+				<programlisting language="sql">
+CREATE TABLE flight_traj_sample AS
+SELECT * FROM flight_traj
+ORDER BY random()
+LIMIT 200;
+</programlisting>
+			</para>
+
 			<programlisting language="sql">
 WITH timePeriod(Period) AS (
   SELECT tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)' ),

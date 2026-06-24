@@ -4,6 +4,30 @@
 Every module in this workshop illustrates a usage scenario of MobilityDB. The data sets and the tools are described inside each
 of the modules.
 
+## Quickstart
+
+Run the workshop locally with Docker. The image bundles PostgreSQL 18, PostGIS 3.6, MobilityDB 1.3, and the workshop datasets under `/Workshop`, so no downloads or edits are required.
+
+```bash
+docker run --name mobilitydb -d -p 5432:5432 mobilitydb/mobilitydb:18-3.6-1.3-workshop
+```
+
+Build the GTFS trips from the bundled data:
+
+```bash
+docker exec -w /Workshop/gtfs_data mobilitydb \
+  psql -U docker -d mobilitydb -f load_gtfs.sql -f load_mobilitydb.sql
+```
+
+Query the result:
+
+```bash
+docker exec -it mobilitydb \
+  psql -U docker -d mobilitydb -c "SELECT trip_id, duration(trip) FROM trips_mdb ORDER BY trip_id LIMIT 5;"
+```
+
+The AIS dataset is bundled at `/Workshop/ais_data/ais.csv`. Follow the chapters for the full tutorials.
+
 ## Documentation
 
 You can generate the workshop documentation from the sources. Go to `/docs` directory and run: 

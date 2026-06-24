@@ -154,6 +154,14 @@ WHERE (maxValue(velocity) IS NOT NULL
 				<span class="strong"><strong>Note:</strong></span> This query makes used of a sample set of data that has 200 flights to return results. <code class="varname">flight_traj_sample</code> is just a sampled version of <code class="varname">flight_traj</code>. As of the writing of this workshop, Grafana does not support display of vectors, and so individual		 latitude and longitude points are used as a proxy.
 			</p><p>
 			In order to make the query use Grafana global time range panel replace the hard-coded timestamps with <code class="literal">[${__from:date}, ${__to:date})</code>.
+			</p><p>
+				We first create the sample table as a random subset of 200 trajectories from <code class="varname">flight_traj</code>.
+				</p><pre class="programlisting">
+CREATE TABLE flight_traj_sample AS
+SELECT * FROM flight_traj
+ORDER BY random()
+LIMIT 200;
+</pre><p>
 			</p><pre class="programlisting">
 WITH timePeriod(Period) AS (
   SELECT tstzspan '[2020-06-01 02:35:00, 2020-06-01 02:55:00)' ),

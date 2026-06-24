@@ -159,7 +159,7 @@ TimeClosestShips(Boat1, Boat2, closestDistance, timeAtClosestDist, tripB1, tripB
     S1.trip AS tripB1, S2.trip
   FROM TimeShips S1, TimeShips S2
   WHERE S1.MMSI &gt; S2.MMSI AND eDwithin(S1.Trip, S2.Trip, 300) )
-SELECT t.boat1, t.boat_2, t.closet_distance, t.timeAtClosestDist,
+SELECT t.boat1, t.boat2, t.closestDistance, t.timeAtClosestDist,
   ST_X(ST_Transform(valueAtTimestamp(tripB1, timeAtClosestDist), 4326) ) AS b1_lng,
   ST_Y(ST_Transform(valueAtTimestamp(tripB1, timeAtClosestDist), 4326) ) AS b1_lat,
   ST_X(ST_Transform(valueAtTimestamp(tripB2, timeAtClosestDist), 4326) ) AS b2_lng,

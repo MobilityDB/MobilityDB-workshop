@@ -1,20 +1,24 @@
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Loading the Data</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch01.html" title="Chapter 1. Managing Ship Trajectories (AIS)"><link rel="prev" href="ch01s04.html" title="Preparing the Database"><link rel="next" href="ch01s06.html" title="Constructing Trajectories"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Loading the Data</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01s04.html">Prev</a> </td><th width="60%" align="center">Chapter 1. Managing Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch01s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm168"></a>Loading the Data</h2></div></div></div><p>
-				For importing CSV data into a PostgreSQL database one can use the <code class="varname">COPY</code> command as follows:
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Loading the Data</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch01.html" title="Chapter 1. Managing Ship Trajectories (AIS)"><link rel="prev" href="ch01s04.html" title="Preparing the Database"><link rel="next" href="ch01s06.html" title="Constructing Trajectories"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Loading the Data</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01s04.html">Prev</a> </td><th width="60%" align="center">Chapter 1. Managing Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch01s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id1564"></a>Loading the Data</h2></div></div></div><p>
+				The bundled file <code class="varname">ais.csv</code> includes the <code class="varname">Geom</code> column, so it is loaded into all columns of the table with the <code class="varname">COPY</code> command as follows:
+				</p><pre class="programlisting">
+COPY AISInput
+FROM '/Workshop/ais_data/ais.csv' DELIMITER ',' CSV HEADER;
+</pre><p>
+			</p><p>
+				It is possible that the above command fails with a permission error. The reason for this is that <code class="varname">COPY</code> is a server capability, while the CSV file is on the client side. To overcome this issue, one can use the <code class="varname">\copy</code> command of <code class="varname">psql</code> as follows:
+				</p><pre class="programlisting">
+psql -d DanishAIS -c "\copy AISInput FROM '/Workshop/ais_data/ais.csv' DELIMITER ',' CSV HEADER;"
+</pre><p>
+			</p><p>
+				The full daily files published by the Danish Maritime Authority do not include the <code class="varname">Geom</code> column, which is computed below. Such a file is loaded by listing the columns explicitly so that <code class="varname">Geom</code> is left empty:
 				</p><pre class="programlisting">
 COPY AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus,
   ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length,
   TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType,
   SizeA, SizeB, SizeC, SizeD)
-FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER;
+FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER ',' CSV HEADER;
 </pre><p>
-			</p><p>
-				It is possible that the above command fails with a permission error. The reason for this is that <code class="varname">COPY</code> is a server capability, while the CSV file is on the client side. To overcome this issue, one can use the <code class="varname">\copy</code> command of <code class="varname">psql</code> as follows:
-				</p><pre class="programlisting">
-psql -d DanishAIS -c "\copy AISInput(T, TypeOfMobile, MMSI, Latitude, Longitude, NavigationalStatus, ROT, SOG, COG, Heading, IMO, CallSign, Name, ShipType, CargoType, Width, Length, TypeOfPositionFixingDevice, Draught, Destination, ETA, DataSourceType, SizeA, SizeB, SizeC, SizeD) FROM '/home/mobilitydb/DanishAIS/aisdk-2023-06-01.csv' DELIMITER  ',' CSV HEADER;"
-</pre><p>
-				In addition, if you downloaded the CSV file from <a class="ulink" href="https://github.com/MobilityDB/MobilityDB-workshop/tree/master/data" target="_top">this repo's data</a> , then you will need to add the column 'geom' to the command.
-			</p><p>
-				This import took about 1 minute and 30 seconds on my machine, which is a development laptop. The CSV file has 11,809,593 rows, all of which were correctly imported. For bigger datasets, one could alternative could use the program <a class="ulink" href="https://github.com/dimitri/pgloader" target="_top">pgloader</a>.
+				For bigger datasets, one could alternatively use the program <a class="ulink" href="https://github.com/dimitri/pgloader" target="_top">pgloader</a>.
 			</p><p>
 				We clean up some of the fields in the table and create spatial points with the following command.
 				</p><pre class="programlisting">

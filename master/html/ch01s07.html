@@ -1,4 +1,4 @@
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Basic Data Exploration</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch01.html" title="Chapter 1. Managing Ship Trajectories (AIS)"><link rel="prev" href="ch01s06.html" title="Constructing Trajectories"><link rel="next" href="ch01s08.html" title="Analyzing the Trajectories"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Basic Data Exploration</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01s06.html">Prev</a> </td><th width="60%" align="center">Chapter 1. Managing Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch01s08.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="idm221"></a>Basic Data Exploration</h2></div></div></div><p>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Basic Data Exploration</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch01.html" title="Chapter 1. Managing Ship Trajectories (AIS)"><link rel="prev" href="ch01s06.html" title="Constructing Trajectories"><link rel="next" href="ch01s08.html" title="Analyzing the Trajectories"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Basic Data Exploration</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01s06.html">Prev</a> </td><th width="60%" align="center">Chapter 1. Managing Ship Trajectories (AIS)</th><td width="20%" align="right"> <a accesskey="n" href="ch01s08.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id1621"></a>Basic Data Exploration</h2></div></div></div><p>
 				The total distance traveled by all ships:
 			</p><p>
 				</p><pre class="programlisting">
@@ -50,9 +50,9 @@ WHERE length(Trip) = 0 OR length(Trip) &gt;= 1500000;
 			</p><div class="figure-float"><div class="figure"><a name="imgtrajsfiltered"></a><p class="title"><b>Figure 1.3. Ship trajectories after filtering</b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/trajsFiltered.png" width="100%" alt="Ship trajectories after filtering"></td></tr></table></div></div></div><br class="figure-break"></div><p>
 				Let's have a look at the speed of the ships. There are two speed values in the data; the speed calculated from the spatiotemporal trajectory <code class="varname">speed(Trip)</code>, and the <code class="varname">SOG</code> attribute. Optimally, the two will be the same. A small variance would still be OK, because of sensor errors. Note that both are temporal floats. In the next query, we compare the averages of the two speed values for every ship:
 				</p><pre class="programlisting">
-SELECT ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) SpeedDifference
+SELECT ABS(twAvg(SOG) * 1.852 - twAvg(speed(Trip))* 3.6 ) SpeedDifference
 FROM Ships WHERE SOG IS NOT NULL AND
-  ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) &gt; 10.0
+  ABS(twAvg(SOG) * 1.852 - twAvg(speed(Trip))* 3.6 ) &gt; 10.0
 ORDER BY SpeedDifference DESC;
 
   speeddifference
@@ -70,19 +70,19 @@ ORDER BY SpeedDifference DESC;
 ...
 </pre><p>
 			</p><p>
-				The <code class="varname">twavg</code> computes a time-weighted average of a temporal float. It basically computes the area under the curve, then divides it by the time duration of the temporal float. By doing so, the speed values that remain for longer durations affect the average more than those that remain for shorter durations. Note that SOG is in knot, and Speed(Trip) is in m/s. The query converts both to km/h.
+				The <code class="varname">twAvg</code> computes a time-weighted average of a temporal float. It basically computes the area under the curve, then divides it by the time duration of the temporal float. By doing so, the speed values that remain for longer durations affect the average more than those that remain for shorter durations. Note that SOG is in knot, and Speed(Trip) is in m/s. The query converts both to km/h.
 			</p><p>
 				The query shows the first 10 ship trajectories of the 82 in the table that have a difference of more than 10 km/h. These trajectories are shown in <a class="xref" href="ch01s07.html#imgtrajsWrongSpeed" title="Figure 1.4. Ship trajectories with big difference between speed(Trip) and SOG">Figure 1.4, “Ship trajectories with big difference between <code class="varname">speed(Trip)</code> and <code class="varname">SOG</code>”</a>. Again they look like noise, so we remove them with the following query
 				</p><pre class="programlisting">
 DELETE FROM Ships 
-WHERE ABS(twavg(SOG) * 1.852 - twavg(speed(Trip))* 3.6 ) &gt; 10;
+WHERE ABS(twAvg(SOG) * 1.852 - twAvg(speed(Trip))* 3.6 ) &gt; 10;
 </pre><p>
 			</p><div class="figure-float"><div class="figure"><a name="imgtrajsWrongSpeed"></a><p class="title"><b>Figure 1.4. Ship trajectories with big difference between <code class="varname">speed(Trip)</code> and <code class="varname">SOG</code></b></p><div class="figure-contents"><div class="mediaobject"><table border="0" summary="manufactured viewport for HTML img" style="cellpadding: 0; cellspacing: 0;" width="80%"><tr><td><img src="images/trajsWrongSpeed.png" width="100%" alt="Ship trajectories with big difference between speed(Trip) and SOG"></td></tr></table></div></div></div><br class="figure-break"></div><p>
 				Now we do a similar comparison between the calculated azimuth from the spatiotemporal trajectory, and the attribute COG:
 				</p><pre class="programlisting">
-SELECT ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) AzimuthDifference 
+SELECT ABS(twAvg(COG) - twAvg(azimuth(Trip)) * 180.0/pi()) AzimuthDifference 
 FROM Ships 
-WHERE ABS(twavg(COG) - twavg(azimuth(Trip)) * 180.0/pi()) &gt; 45.0 
+WHERE ABS(twAvg(COG) - twAvg(azimuth(Trip)) * 180.0/pi()) &gt; 45.0 
 ORDER BY AzimuthDifference DESC;
 
  azimuthdifference

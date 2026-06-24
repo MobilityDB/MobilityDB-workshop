@@ -9,12 +9,12 @@ MobilityDB uses DocBook v4.5 to generate workshop guides. The instructions below
 ## Contribution Workflow
 
 Steps are as follows:
-- Usually, the latest version of the workshop guide is in the `develop` branch. Refer always to this branch.
+- The latest version of the workshop guide is in the `master` branch. Refer always to this branch.
 - Fork the repository and clone it locally.
-- Create a new branch from `develop` and name it `feature/<your_feature_name>`. For example, 'feature/correcting_typos'.
+- Create a new branch from `master` and name it `feature/<your_feature_name>`. For example, 'feature/correcting_typos'.
 - Make your changes and commit them to your branch.
 - Push your branch to your forked repository.
-- Create a pull request from your branch to the `develop` branch of the main repository. Please, make sure to detail your changes in the pull request description. A nice way to do this is to use the following template:
+- Create a pull request from your branch to the `master` branch of the main repository. Please, make sure to detail your changes in the pull request description. A nice way to do this is to use the following template:
   
   ```markdown 
   Changes:

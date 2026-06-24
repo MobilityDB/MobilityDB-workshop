@@ -19,11 +19,11 @@ You can generate the workshop documentation from the sources. Go to `/docs` dire
     ```bash
     dbtoepub -o mobilitydb-workshop.epub mobilitydb-workshop.xml
     ```
-In addition, pregenerated versions of them are available for both the master and develop branches.
+In addition, pregenerated versions of them are available for the master branch.
 
-*   HTML: [master](https://mobilitydb.github.io/MobilityDB-workshop/master/html/index.html), [develop](https://mobilitydb.github.io/MobilityDB-workshop/develop/html/index.html)
-*   PDF: [master](https://mobilitydb.github.io/MobilityDB-workshop/master/mobilitydb-manual.pdf), [develop](https://mobilitydb.github.io/MobilityDB-workshop/develop/mobilitydb-manual.pdf)
-*   EPUB: [master](https://mobilitydb.github.io/MobilityDB-workshop/master/mobilitydb-manual.epub), [develop](https://mobilitydb.github.io/MobilityDB-workshop/develop/mobilitydb-manual.epub)
+*   HTML: [master](https://mobilitydb.github.io/MobilityDB-workshop/master/html/index.html)
+*   PDF: [master](https://mobilitydb.github.io/MobilityDB-workshop/master/mobilitydb-workshop.pdf)
+*   EPUB: [master](https://mobilitydb.github.io/MobilityDB-workshop/master/mobilitydb-workshop.epub)
 
 ## How the Repo is Organized
 - `/data`: raw data files used for some workshops

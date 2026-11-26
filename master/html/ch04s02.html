@@ -1,29 +1,36 @@
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>Transforming GTFS Data for MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="prev" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="next" href="ch05.html" title="Chapter 5. Managing Google Location History"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Transforming GTFS Data for MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04.html">Prev</a> </td><th width="60%" align="center">Chapter 4. Managing GTFS Data</th><td width="20%" align="right"> <a accesskey="n" href="ch05.html">Next</a></td></tr></table><hr></div><div class="sect1"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2786"></a>Transforming GTFS Data for MobilityDB</h2></div></div></div><p>
-			We start by creating a table that contains couples of <code class="varname">service_id</code> and <code class="varname">date</code> defining the dates at which a service is provided.
+<html><head><meta charset="UTF-8"><title>Transforming GTFS Data for MobilityDB</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="prev" href="ch04.html" title="Chapter 4. Managing GTFS Data"><link rel="next" href="ch05.html" title="Chapter 5. Managing Google Location History"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Transforming GTFS Data for MobilityDB</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04.html">Prev</a> </td><th width="60%" align="center">Chapter 4. Managing GTFS Data</th><td width="20%" align="right"> <a accesskey="n" href="ch05.html">Next</a></td></tr></table><hr></div><div class="sect1"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2786"></a>Transforming GTFS Data for MobilityDB</h2></div></div></div><p>
+			We start by creating a table that contains, for each <code class="varname">service_id</code>, the set of dates at which the service is provided, as a <code class="varname">dateset</code>, together with the origins of those days.
 			</p><pre class="programlisting">
 DROP TABLE IF EXISTS service_dates;
-CREATE TABLE service_dates AS (
-SELECT service_id, date_trunc('day', d)::date AS date
-FROM calendar c, generate_series(start_date, end_date, '1 day'::interval) AS d
-WHERE (
-  (monday = 1 AND extract(isodow FROM d) = 1) OR
-  (tuesday = 1 AND extract(isodow FROM d) = 2) OR
-  (wednesday = 1 AND extract(isodow FROM d) = 3) OR
-  (thursday = 1 AND extract(isodow FROM d) = 4) OR
-  (friday = 1 AND extract(isodow FROM d) = 5) OR
-  (saturday = 1 AND extract(isodow FROM d) = 6) OR
-  (sunday = 1 AND extract(isodow FROM d) = 7)
-) 
-EXCEPT
-SELECT service_id, date
-FROM calendar_dates WHERE exception_type = 2
-UNION
-SELECT c.service_id, date
-FROM calendar c JOIN calendar_dates d ON c.service_id = d.service_id
-WHERE exception_type = 1 AND start_date &lt;= date AND date &lt;= end_date
-);
+CREATE TABLE service_dates AS
+WITH b AS (
+  SELECT c.service_id, setUnion(d::date) AS dates
+  FROM calendar c,
+    generate_series(c.start_date, c.end_date, interval '1 day') AS d
+  WHERE (ARRAY[c.monday, c.tuesday, c.wednesday, c.thursday, c.friday,
+    c.saturday, c.sunday])[extract(isodow FROM d)] = 1
+  GROUP BY c.service_id ),
+a AS (
+  SELECT service_id, setUnion(date) AS dates FROM calendar_dates
+  WHERE exception_type = 1 GROUP BY service_id ),
+x AS (
+  SELECT service_id, setUnion(date) AS dates FROM calendar_dates
+  WHERE exception_type = 2 GROUP BY service_id ),
+ba AS (
+  SELECT service_id,
+    CASE WHEN b.dates IS NULL THEN a.dates WHEN a.dates IS NULL THEN b.dates
+      ELSE b.dates + a.dates END AS dates
+  FROM b FULL JOIN a USING (service_id) )
+SELECT service_id,
+  CASE WHEN x.dates IS NULL THEN ba.dates ELSE ba.dates - x.dates END AS dates
+FROM ba LEFT JOIN x USING (service_id);
+DELETE FROM service_dates WHERE dates IS NULL;
+
+ALTER TABLE service_dates ADD COLUMN origins tstzset;
+UPDATE service_dates
+SET origins = origins(dates, (SELECT agency_timezone FROM agency LIMIT 1));
 			</pre><p>
-			This table transforms the service patterns in the <code class="varname">calendar</code> table valid between a <code class="varname">start_date</code> and an <code class="varname">end_date</code> taking into account the week days, and then remove the exceptions of type 2 and add the exceptions of type 1 that are specified in table <code class="varname">calendar_dates</code>.
+			The days of the weekly pattern of the <code class="varname">calendar</code> table between its <code class="varname">start_date</code> and its <code class="varname">end_date</code> are united with the dates of exception type 1 of table <code class="varname">calendar_dates</code>, which add a date whether or not the service has a weekly pattern, and the dates of exception type 2, which remove a date, are subtracted. The function <code class="varname">origins</code> returns, for each date, its origin in the time zone of the agency: the instant at which the clock reads noon on that day, minus twelve hours. GTFS measures the stop times of a service day from that instant, which is the local midnight except on the days of a daylight-saving change.
 		</p><p>
 			We now create a table <code class="varname">trip_stops</code> that determines the stops for each trip.
 			</p><pre class="programlisting">
@@ -148,41 +155,65 @@ CREATE TABLE trips_input (
   trip_id text,
   route_id text,
   service_id text,
-  date date,
   point_geom geometry,
   t timestamptz
 );
 
 INSERT INTO trips_input
-SELECT trip_id, route_id, t.service_id, date, point_geom, date + point_arrival_time AS t
-FROM trip_points t JOIN
-( SELECT service_id, MIN(date) AS date FROM service_dates GROUP BY service_id) s
-ON t.service_id = s.service_id;
+SELECT trip_id, route_id, t.service_id, point_geom,
+  startValue(s.origins) + point_arrival_time AS t
+FROM trip_points t JOIN service_dates s ON t.service_id = s.service_id;
 			</pre><p>
-			In the inner query of the <code class="varname">INSERT</code> statement, we select the first date of a service in the <code class="varname">service_dates</code> table and then we join the resulting table with the <code class="varname">trip_points</code> table to compute the arrival time at each point composing the trips. Notice that we filter the first date of each trip for optimization purposes because in the next step below we use the <code class="varname">shiftTime</code> function to compute the trips to all other dates. Alternatively, we could join the two tables but this will be considerably slower for big GTFS files.
+			Each trip is timed once, from the origin of the first day of its service, the first value of its <code class="varname">origins</code>: the arrival time at each point is that origin plus the arrival time of <code class="varname">trip_points</code>, a duration from the start of the service day, so that a time beyond 24:00 needs no special treatment.
 		</p><p>
-			Finally, table <code class="varname">trips_mdb</code> contains the MobilityDB trips.
+			We now build one trip per <code class="varname">trip_id</code>, its template, kept with the origins of all the days of its service.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS trip_templates;
+CREATE TABLE trip_templates (
+  trip_id text PRIMARY KEY,
+  service_id text NOT NULL,
+  route_id text NOT NULL,
+  ref timestamptz NOT NULL,
+  origins tstzset NOT NULL,
+  trip tgeompoint
+);
+
+INSERT INTO trip_templates(trip_id, service_id, route_id, ref, origins, trip)
+SELECT i.trip_id, i.service_id, i.route_id, startValue(s.origins), s.origins,
+  tgeompointSeq(array_agg(tgeompoint(i.point_geom, i.t) ORDER BY i.t))
+FROM trips_input i JOIN service_dates s ON i.service_id = s.service_id
+GROUP BY i.trip_id, i.service_id, i.route_id, s.origins;
+			</pre><p>
+			We group the rows in the <code class="varname">trips_input</code> table by <code class="varname">trip_id</code> while keeping the <code class="varname">route_id</code> attribute, use the <code class="varname">array_agg</code> function to construct an array containing the temporal points composing the trip ordered by time, and compute the trip from this array using the function <code class="varname">tgeompointSeq</code>. Its reference origin <code class="varname">ref</code> is the origin it is timed from.
+		</p><p>
+			Finally, table <code class="varname">trips_mdb</code> contains the MobilityDB trips, one for each trip and each day of its service.
 			</p><pre class="programlisting">
 DROP TABLE IF EXISTS trips_mdb;
 CREATE TABLE trips_mdb (
-	trip_id text NOT NULL,
-	service_id text NOT NULL,
-	route_id text NOT NULL,
-	date date NOT NULL,
-	trip tgeompoint,
-	PRIMARY KEY (trip_id, date)
+  trip_id text NOT NULL,
+  service_id text NOT NULL,
+  route_id text NOT NULL,
+  date date NOT NULL,
+  trip tgeompoint,
+  PRIMARY KEY (trip_id, date)
 );
 
 INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
-SELECT trip_id, service_id, route_id, date, tgeompointSeq(array_agg(
-  tgeompoint(point_geom, t) ORDER BY T))
-FROM trips_input
-GROUP BY trip_id, service_id, route_id, date;
-
-INSERT INTO trips_mdb(trip_id, service_id, route_id, date, trip)
-SELECT trip_id, t.service_id, route_id, d.date,
-  shiftTime(trip, make_interval(days =&gt; d.date - t.date))
-FROM trips_mdb t JOIN service_dates d ON t.service_id = d.service_id AND t.date &lt;&gt; d.date;
+SELECT t.trip_id, t.service_id, t.route_id, d,
+  occurrence(t.trip, t.ref, o)
+FROM trip_templates t JOIN service_dates s USING (service_id),
+  unnest(s.dates) WITH ORDINALITY AS u(d, n),
+  LATERAL (SELECT valueN(s.origins, n::int) AS o) AS v;
 			</pre><p>
-			In the first <code class="varname">INSERT</code> statement we group the rows in the <code class="varname">trips_input</code> table by <code class="varname">trip_id</code> and <code class="varname">date</code> while keeping the <code class="varname">route_id</code> atribute, use the <code class="varname">array_agg</code> function to construct an array containing the temporal points composing the trip ordered by time, and compute the trip from this array using the function <code class="varname">tgeompointSeq</code>. As explained above, table <code class="varname">trips_input</code> only contains the first date of a trip. In the second <code class="varname">INSERT</code> statement we add the trips for all the other dates with the function <code class="varname">shiftTime</code>.
+			The function <code class="varname">occurrence</code> returns the template shifted by the elapsed time from its reference origin to the origin of a day, so that every point keeps its distance from the origin of its service day, also on the day of a daylight-saving change. The dates and the origins of a service are in the same order, so the <code class="varname">n</code>-th date has the <code class="varname">n</code>-th origin.
+		</p><p>
+			The table <code class="varname">trips_mdb</code> materializes every trip of every day. A query reading a period needs only the trips of that period, which the table function <code class="varname">occurrences</code> builds from the templates, as <code class="varname">generate_series</code> builds the values of a range, without storing them. For example, the trips running on Monday 28 October 2019 between 8:00 and 9:00 are obtained as follows.
+			</p><pre class="programlisting">
+SELECT t.trip_id, o.origin, o.occurrence
+FROM trip_templates t,
+  occurrences(t.trip, t.ref, t.origins,
+    span(timestamptz '2019-10-28 08:00:00+01', timestamptz '2019-10-28 09:00:00+01',
+      true, true)) AS o;
+			</pre><p>
+			The function selects, by binary search in the origins of each template, the days whose trip meets the period, and builds only those trips.
 		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter 4. Managing GTFS Data </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Chapter 5. Managing Google Location History</td></tr></table></div></body></html>

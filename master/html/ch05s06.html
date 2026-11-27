@@ -1,0 +1,62 @@
+<html><head><meta charset="UTF-8"><title>Exploring a Day of Service</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05s05.html" title="Loading the Routes and Stops"><link rel="next" href="ch05s07.html" title="Detecting Incidents"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Exploring a Day of Service</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s05.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch05s07.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2928"></a>Exploring a Day of Service</h2></div></div></div><p>The commercial speed of each mode is the distance its vehicles travelled divided by the time they were tracked, stops and layovers included.
+			</p><pre class="programlisting">
+SELECT CASE r.route_type WHEN 0 THEN 'tram' WHEN 1 THEN 'metro' ELSE 'bus' END AS mode,
+  count(*) AS runs, round(sum(length(trip)) / 1000) AS km,
+  round((sum(length(trip)) / extract(epoch FROM sum(duration(trip))) * 3.6)::numeric, 1) AS kmh
+FROM stib_vehicles v JOIN routes r USING (route_id)
+GROUP BY 1 ORDER BY 1;
+--  mode  | runs  |  km   | kmh  
+-- -------+-------+-------+------
+--  bus   | 15151 | 82947 | 10.0
+--  metro |  1453 | 14424 | 18.7
+--  tram  |  7271 | 45021 | 11.1
+-- (3 rows)</pre><p>
+			The metro is only observed at its stations, so its trajectory is the straight line between consecutive stations, which slightly underestimates its distance.
+		</p><p>The slowest lines during the morning peak are obtained by restricting the trajectories to the period from 8:00 to 9:00 with the function <code class="varname">atTime</code>. The operator <code class="varname">&amp;&amp;</code> keeps the runs whose bounding box overlaps the period, using the GiST index of the table.
+			</p><pre class="programlisting">
+SELECT line_id, count(*) AS runs,
+  round((sum(length(atTime(trip, p))) /
+    extract(epoch FROM sum(duration(atTime(trip, p)))) * 3.6)::numeric, 1) AS kmh
+FROM stib_vehicles,
+  LATERAL (SELECT tstzspan '[2026-11-16 08:00, 2026-11-16 09:00)' AS p) AS s
+WHERE trip &amp;&amp; p
+GROUP BY line_id HAVING count(*) &gt;= 10
+ORDER BY kmh LIMIT 5;
+--  line_id | runs | kmh 
+-- ---------+------+-----
+--  T81     |   23 | 7.1
+--  34      |   31 | 7.5
+--  64      |   24 | 7.9
+--  86      |   32 | 8.0
+--  29      |   32 | 8.2
+-- (5 rows)</pre><p>
+		</p><p>The trajectory of one GTFS trip is the part of a run during which its temporal attribute <code class="varname">trip_id</code> had the trip as value. The operator <code class="varname">?=</code> keeps the runs that ever carried the trip, and the function <code class="varname">whenTrue</code> returns the periods during which the trip was carried.
+			</p><pre class="programlisting">
+SELECT vehicle_id,
+  startTimestamp(whenTrue(trip_id #= '134460577341186002'::text))::time(0) AS since,
+  round(length(atTime(trip, whenTrue(trip_id #= '134460577341186002'::text)))) AS metres,
+  duration(whenTrue(trip_id #= '134460577341186002'::text))::interval(0) AS duration
+FROM stib_vehicles
+WHERE trip_id ?= '134460577341186002'::text
+ORDER BY since;
+--               vehicle_id              |  since   | metres | duration 
+-- --------------------------------------+----------+--------+----------
+--  022ff490-1234-4635-bf73-48f8003afa7a | 08:04:02 |   1845 | 00:10:28
+--  b58377f3-6e03-4d18-ae0a-e1735a79ee9d | 08:14:30 |   5642 | 00:29:26
+-- (2 rows)</pre><p>
+			The trip was carried by two runs: the platform lost the vehicle after 1.8 kilometres and found it again as a new run.
+		</p><p>The time-weighted average of the delay, computed with the function <code class="varname">twAvg</code>, weighs each value by how long it held, and the function <code class="varname">maxValue</code> returns the largest delay of a run.
+			</p><pre class="programlisting">
+SELECT line_id, round((avg(twAvg(delay)) / 60)::numeric, 1) AS avg_delay_min,
+  max(maxValue(delay)) / 60 AS max_delay_min
+FROM stib_vehicles WHERE delay IS NOT NULL
+GROUP BY line_id ORDER BY avg_delay_min DESC LIMIT 5;
+--  line_id | avg_delay_min | max_delay_min 
+-- ---------+---------------+---------------
+--  36      |           2.2 |            17
+--  77      |           2.1 |            12
+--  75      |           1.9 |            22
+--  73      |           1.9 |            12
+--  79      |           1.9 |            22
+-- (5 rows)</pre><p>
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s05.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s07.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Loading the Routes and Stops </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Detecting Incidents</td></tr></table></div></body></html>

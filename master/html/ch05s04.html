@@ -1,0 +1,35 @@
+<html><head><meta charset="UTF-8"><title>Building the Trajectories</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05s03.html" title="Loading the Positions"><link rel="next" href="ch05s05.html" title="Loading the Routes and Stops"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Building the Trajectories</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s03.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch05s05.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2912"></a>Building the Trajectories</h2></div></div></div><p>We build one row per vehicle run, with its trajectory and three temporal attributes.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS stib_vehicles;
+CREATE TABLE stib_vehicles AS
+SELECT vehicle_id, line_id, route_id,
+  appendInstant(tgeompoint(geom, t), 'linear', 1000.0, interval '2 minutes'
+    ORDER BY t) AS trip,
+  appendInstant(ttext(trip_id, t), 'step', interval '2 minutes' ORDER BY t)
+    FILTER (WHERE trip_id IS NOT NULL) AS trip_id,
+  appendInstant(tint(delay, t), 'step', NULL, interval '2 minutes' ORDER BY t)
+    FILTER (WHERE delay IS NOT NULL) AS delay,
+  appendInstant(ttext(status, t), 'step', interval '2 minutes' ORDER BY t)
+    FILTER (WHERE status IS NOT NULL) AS status
+FROM stib_positions
+GROUP BY vehicle_id, line_id, route_id;
+
+DELETE FROM stib_vehicles WHERE numInstants(trip) = 1;
+UPDATE stib_vehicles v
+SET trip = (SELECT tgeompointSeqSet(array_agg(s ORDER BY startTimestamp(s)))
+  FROM unnest(sequences(v.trip)) AS s WHERE numInstants(s) &gt; 1)
+WHERE numSequences(v.trip) &gt; 1;
+DELETE FROM stib_vehicles WHERE trip IS NULL;
+CREATE INDEX ON stib_vehicles USING gist (trip);</pre><p>
+			The aggregate function <code class="varname">appendInstant</code> appends the positions of a run in time order. Its arguments give the interpolation, linear for the position and step for the attributes, and the gaps: a new sequence starts when two consecutive positions are more than 1,000 metres or 2 minutes apart, so that the trajectory does not invent a path across a missing stretch of data. A temporal text <code class="varname">trip_id</code> keeps the GTFS trip of the run over time, since a run can carry several trips and a trip can be carried by several runs when the platform loses a vehicle and finds it again. A temporal integer <code class="varname">delay</code> and a temporal text <code class="varname">status</code> keep the delay and the status at a stop. The trajectory keeps only the positions it needs: a position on the straight line between its neighbours at the matching time adds nothing.
+			</p><pre class="programlisting">
+SELECT count(*) AS runs, sum(numInstants(trip)) AS instants,
+  sum(numSequences(trip)) AS sequences,
+  pg_size_pretty(pg_total_relation_size('stib_vehicles')) AS size
+FROM stib_vehicles;
+--  runs  | instants | sequences | size  
+-- -------+----------+-----------+-------
+--  23875 |  1513338 |     26844 | 79 MB
+-- (1 row)</pre><p>
+			The day's 2,256,768 positions become 1,513,338 instants. A run made of a single position, and an isolated position between two gaps, describe no movement and are removed by the <code class="varname">DELETE</code> and <code class="varname">UPDATE</code> statements above.
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s03.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s05.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Loading the Positions </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Loading the Routes and Stops</td></tr></table></div></body></html>

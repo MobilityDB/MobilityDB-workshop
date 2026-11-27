@@ -1,0 +1,68 @@
+<html><head><meta charset="UTF-8"><title>Detecting Incidents</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05s06.html" title="Exploring a Day of Service"><link rel="next" href="ch05s08.html" title="Following the Vehicles Live"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Detecting Incidents</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s06.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch05s08.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2945"></a>Detecting Incidents</h2></div></div></div><p>A vehicle that stays still for several minutes away from any stop is a sign of an incident: a breakdown, an accident, or a blocked track. The function <code class="varname">stops</code> returns the parts of a trajectory during which the vehicle stayed within a given distance, here 20 metres, for at least a given duration, here 3 minutes. We ignore the metro, which is only observed at its stations, the stops at the start and at the end of a run, which are layovers at a terminus, and the stops within 50 metres of a stop of the network. The status of the feed cannot replace this last test: a vehicle waiting at a terminus can be reported <code class="varname">IN_TRANSIT_TO</code> its first stop.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS stopped;
+CREATE TABLE stopped AS
+SELECT v.vehicle_id, v.line_id, s.stop
+FROM stib_vehicles v JOIN routes r USING (route_id),
+  unnest(sequences(stops(v.trip, 20.0, interval '3 minutes'))) AS s(stop)
+WHERE r.route_type &lt;&gt; 1
+  AND startTimestamp(s.stop) &gt; startTimestamp(v.trip)
+  AND endTimestamp(s.stop) &lt; endTimestamp(v.trip)
+  AND NOT EXISTS (SELECT 1 FROM stops p
+    WHERE ST_DWithin(p.stop_geom, startValue(s.stop), 50.0));
+SELECT count(*) AS alarms, count(DISTINCT vehicle_id) AS vehicles FROM stopped;
+SELECT line_id, startTimestamp(stop)::time(0) AS since,
+  duration(stop)::interval(0) AS stopped_for, n.stop_name AS nearest_stop,
+  round(ST_Distance(startValue(stop), n.stop_geom)) AS metres
+FROM stopped, LATERAL (SELECT stop_name, stop_geom FROM stops
+  ORDER BY stop_geom &lt;-&gt; startValue(stop) LIMIT 1) AS n
+ORDER BY duration(stop) DESC LIMIT 5;
+--  alarms | vehicles 
+-- --------+----------
+--     755 |      705
+-- (1 row)
+--
+--  line_id |  since   | stopped_for |  nearest_stop   | metres 
+-- ---------+----------+-------------+-----------------+--------
+--  42      | 14:19:53 | 00:39:09    | VIADUC E40      |     54
+--  89      | 15:33:49 | 00:29:04    | DELACROIX       |    205
+--  87      | 19:31:36 | 00:28:39    | GARE DE BERCHEM |    108
+--  95      | 09:18:17 | 00:26:46    | SCIENCE         |     88
+--  T81     | 16:14:15 | 00:24:59    | CONSEIL         |     60
+-- (5 rows)</pre><p>
+		</p><p>A vehicle crawling in traffic moves, but slowly. The function <code class="varname">speed</code> returns the speed of a trajectory in metres per second as a temporal float, the comparison <code class="varname">#&lt;</code> returns a temporal Boolean that is true while the speed is below 5 km/h, and the function <code class="varname">whenTrue</code> returns the periods during which it is true. We keep the periods of at least 5 minutes during which the vehicle moved at least 50 metres, which leaves out the time spent at a stop.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS slowed;
+CREATE TABLE slowed AS
+SELECT v.vehicle_id, v.line_id, p AS period, length(atTime(v.trip, p)) AS metres
+FROM stib_vehicles v JOIN routes r USING (route_id),
+  unnest(spans(whenTrue(speed(v.trip) #&lt; 5 / 3.6))) AS p
+WHERE r.route_type &lt;&gt; 1 AND duration(p) &gt;= interval '5 minutes'
+  AND length(atTime(v.trip, p)) &gt;= 50.0;
+SELECT extract(hour FROM lower(period)) AS hour, count(*) AS alarms
+FROM slowed GROUP BY 1 ORDER BY 1;
+--  hour | alarms 
+-- ------+--------
+--     0 |      2
+--     5 |      1
+--     6 |      4
+--     7 |     18
+--     8 |     30
+--     9 |     45
+--    10 |      4
+--    11 |     17
+--    12 |     12
+--    13 |     10
+--    14 |     11
+--    15 |     20
+--    16 |     46
+--    17 |     67
+--    18 |     45
+--    19 |      8
+--    20 |      7
+--    21 |      4
+--    22 |      3
+--    23 |      1
+-- (20 rows)</pre><p>
+			The alarms concentrate in the morning and in the evening peaks.
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s06.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s08.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Exploring a Day of Service </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Following the Vehicles Live</td></tr></table></div></body></html>

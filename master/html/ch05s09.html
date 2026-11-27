@@ -1,0 +1,29 @@
+<html><head><meta charset="UTF-8"><title>Serving Vector Tiles</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05s08.html" title="Following the Vehicles Live"><link rel="next" href="ch06.html" title="Chapter 6. Managing Google Location History"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Serving Vector Tiles</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s08.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2970"></a>Serving Vector Tiles</h2></div></div></div><p>A map shows the trajectories as <a class="ulink" href="https://github.com/mapbox/vector-tile-spec" target="_top">Mapbox vector tiles</a>. The following function returns the tile <code class="varname">z/x/y</code> of the trajectories during a period. The function <code class="varname">asMVTGeom</code> clips a trajectory to the tile and returns its geometry in tile coordinates together with the time of each of its points, which a client uses to animate the vehicles.
+			</p><pre class="programlisting">
+CREATE OR REPLACE FUNCTION stib_tile(z integer, x integer, y integer,
+  p_start timestamptz, p_end timestamptz)
+RETURNS bytea AS $$
+  WITH bounds AS (
+    SELECT ST_TileEnvelope(z, x, y) AS geom ),
+  vals AS (
+    SELECT v.vehicle_id, v.line_id,
+      asMVTGeom(transform(s, 3857), stbox(b.geom)) AS geom_times
+    FROM stib_vehicles v, bounds b,
+      unnest(sequences(atTime(v.trip, span(p_start, p_end)))) AS s
+    WHERE v.trip &amp;&amp; stbox(ST_Transform(b.geom, 31370), span(p_start, p_end)) ),
+  mvtgeom AS (
+    SELECT (geom_times).geom, (geom_times).times, vehicle_id, line_id
+    FROM vals
+    WHERE GeometryType((geom_times).geom) &lt;&gt; 'GEOMETRYCOLLECTION' )
+  SELECT ST_AsMVT(mvtgeom) FROM mvtgeom;
+$$ LANGUAGE sql STABLE PARALLEL SAFE;</pre><p>
+			Each sequence of a trajectory is a feature of its own. When the part of a sequence inside the tile is made of lines and of an isolated position, <code class="varname">asMVTGeom</code> returns a collection of lines and a point, which a vector tile cannot encode; the function leaves these rare pieces out.
+			</p><pre class="programlisting">
+SELECT length(stib_tile(13, 4195, 2748, '2026-11-16 08:00', '2026-11-16 08:15'))
+  AS bytes;
+--  bytes 
+-- -------
+--  61423
+-- (1 row)</pre><p>
+			A tile server that publishes PostgreSQL functions, such as <a class="ulink" href="https://github.com/CrunchyData/pg_tileserv" target="_top">pg_tileserv</a> or <a class="ulink" href="https://github.com/maplibre/martin" target="_top">Martin</a>, serves this function to a web map.
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s08.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch06.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Following the Vehicles Live </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Chapter 6. Managing Google Location History</td></tr></table></div></body></html>

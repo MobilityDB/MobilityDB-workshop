@@ -1,0 +1,66 @@
+<html><head><meta charset="UTF-8"><title>Following the Vehicles Live</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05s07.html" title="Detecting Incidents"><link rel="next" href="ch05s09.html" title="Serving Vector Tiles"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Following the Vehicles Live</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s07.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch05s09.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2956"></a>Following the Vehicles Live</h2></div></div></div><p>The endpoint <code class="varname">/stib/vehicle-trip</code> returns the latest positions as GeoJSON. The table <code class="varname">live_vehicles</code> keeps the trajectory of each run, and the function <code class="varname">stib_ingest</code> appends the positions of a snapshot to it with the function <code class="varname">appendInstant</code>. A snapshot read twice appends nothing, since a position is only appended after the last one of its trajectory.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS live_vehicles;
+CREATE TABLE live_vehicles (
+  vehicle_id text PRIMARY KEY,
+  line_id text,
+  route_id text,
+  trip_id ttext,
+  trip tgeompoint
+);
+
+CREATE OR REPLACE FUNCTION stib_ingest(snapshot jsonb)
+RETURNS integer AS $$
+  WITH f AS (
+    SELECT f-&gt;'properties' AS p,
+      ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(f-&gt;'geometry'), 4326), 31370) AS geom
+    FROM jsonb_array_elements(snapshot-&gt;'features') AS f ),
+  n AS (
+    SELECT p-&gt;&gt;'uuid' AS vehicle_id, p-&gt;&gt;'lineId' AS line_id, p-&gt;&gt;'routeId' AS route_id,
+      to_timestamp((p-&gt;&gt;'timestamp')::float) AS t, p-&gt;&gt;'tripId' AS trip_id, geom
+    FROM f ),
+  upsert AS (
+    INSERT INTO live_vehicles AS l (vehicle_id, line_id, route_id, trip_id, trip)
+    SELECT vehicle_id, line_id, route_id, ttext(trip_id, t), tgeompoint(geom, t)
+    FROM n
+    ON CONFLICT (vehicle_id) DO UPDATE
+    SET trip = appendInstant(l.trip, EXCLUDED.trip),
+      trip_id = CASE
+        WHEN EXCLUDED.trip_id IS NULL THEN l.trip_id
+        WHEN l.trip_id IS NULL THEN EXCLUDED.trip_id
+        ELSE appendInstant(l.trip_id, EXCLUDED.trip_id) END
+    WHERE getTimestamp(EXCLUDED.trip) &gt; endTimestamp(l.trip)
+    RETURNING 1 )
+  SELECT count(*)::integer FROM upsert;
+$$ LANGUAGE sql;</pre><p>
+		</p><p>The following script polls the endpoint every 20 seconds and passes each snapshot to the function. The command <code class="varname">\set</code> of <code class="varname">psql</code> reads the snapshot into a variable, which a command-line argument could not hold.
+			</p><pre class="programlisting">
+#!/bin/bash
+# Poll the STIB vehicle positions of MobilityTwin.Brussels every 20 seconds
+# and append them to the trajectories of table live_vehicles.
+# Usage: MOBILITYTWIN_TOKEN=... ./stib_live.sh [database]
+DB=${1:-stib}
+URL=https://api.mobilitytwin.brussels/stib/vehicle-trip
+while true; do
+  if curl -sf -H "Authorization: Bearer $MOBILITYTWIN_TOKEN" "$URL" -o snapshot.json; then
+    psql -X -q -At -d "$DB" &lt;&lt;'EOF'
+\set s `cat snapshot.json`
+SELECT now()::time(0) AS polled, stib_ingest(:'s') AS appended;
+EOF
+  fi
+  sleep 20
+done</pre><p>
+			Each line printed is a poll and the number of runs whose trajectory grew. While the script runs, the vehicles that have been standing still for at least 3 minutes away from any stop are obtained as follows.
+			</p><pre class="programlisting">
+SELECT l.line_id, l.vehicle_id, duration(s)::interval(0) AS stopped_for,
+  ST_AsText(ST_Transform(endValue(s), 4326)) AS position
+FROM live_vehicles l,
+  unnest(sequences(stops(atTime(l.trip, span(now() - interval '15 minutes', now())),
+    20.0, interval '3 minutes'))) AS s
+WHERE tempSubType(l.trip) &lt;&gt; 'Instant'
+  AND startTimestamp(s) &gt; startTimestamp(l.trip)
+  AND endTimestamp(s) = endTimestamp(l.trip)
+  AND NOT EXISTS (SELECT 1 FROM stops p
+    WHERE ST_DWithin(p.stop_geom, endValue(s), 50.0));</pre><p>
+			The function <code class="varname">atTime</code> keeps the last 15 minutes of each trajectory, and a vehicle is still standing when its last stop ends with its trajectory. As for the day of service, a stop starting with the trajectory is left out: the vehicle has not moved since the script started, which is how a layover looks.
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s07.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s09.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Detecting Incidents </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Serving Vector Tiles</td></tr></table></div></body></html>

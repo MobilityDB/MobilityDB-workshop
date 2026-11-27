@@ -1,0 +1,44 @@
+<html><head><meta charset="UTF-8"><title>Loading the Positions</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05s02.html" title="Getting the Data"><link rel="next" href="ch05s04.html" title="Building the Trajectories"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Loading the Positions</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s02.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch05s04.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2903"></a>Loading the Positions</h2></div></div></div><p>We create a database <code class="varname">stib</code> with the extension, and set its time zone to the one of Brussels, in which all the times of this chapter are shown.
+			</p><pre class="programlisting">
+CREATE EXTENSION mobilitydb CASCADE;
+ALTER DATABASE stib SET TimeZone = 'Europe/Brussels';</pre><p>
+			We then connect again and load the CSV file, from the directory of the downloaded files.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS stib_input;
+CREATE TABLE stib_input (
+  uuid text,
+  line_id text,
+  direction_id text,
+  direction integer,
+  point_id text,
+  distance_from_point float,
+  route_id text,
+  epoch double precision,
+  trip_id text,
+  start_date text,
+  start_time text,
+  delay integer,
+  status text,
+  stop_id text,
+  stop_sequence integer,
+  lon float,
+  lat float
+);
+\copy stib_input FROM 'stib_positions.csv' WITH (FORMAT csv, HEADER true)
+
+DROP TABLE IF EXISTS stib_positions;
+CREATE TABLE stib_positions AS
+SELECT uuid AS vehicle_id, line_id, route_id, direction, trip_id, delay, status,
+  to_timestamp(epoch) AS t,
+  ST_Transform(ST_Point(lon, lat, 4326), 31370) AS geom
+FROM stib_input;
+CREATE INDEX ON stib_positions (vehicle_id, t);</pre><p>
+			The table <code class="varname">stib_positions</code> keeps the columns we use, with the time as a <code class="varname">timestamptz</code> and the position in the Belgian Lambert 72 projection (EPSG:31370), so that distances are measured in metres.
+			</p><pre class="programlisting">
+SELECT count(*) AS positions, count(DISTINCT vehicle_id) AS runs,
+  min(t), max(t) FROM stib_positions;
+--  positions | runs  |              min              |             max              
+-- -----------+-------+-------------------------------+------------------------------
+--    2256768 | 24711 | 2026-11-16 01:00:00.109004+01 | 2026-11-17 00:59:59.22366+01
+-- (1 row)</pre><p>
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s02.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s04.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Getting the Data </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Building the Trajectories</td></tr></table></div></body></html>

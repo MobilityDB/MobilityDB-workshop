@@ -1,0 +1,36 @@
+<html><head><meta charset="UTF-8"><title>Loading the Routes and Stops</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05s04.html" title="Building the Trajectories"><link rel="next" href="ch05s06.html" title="Exploring a Day of Service"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Loading the Routes and Stops</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05s04.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch05s06.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2923"></a>Loading the Routes and Stops</h2></div></div></div><p>From the GTFS timetable of the day we only need the routes, which give the mode of each line, and the stops.
+			</p><pre class="programlisting">
+DROP TABLE IF EXISTS routes;
+CREATE TABLE routes (
+  route_id text PRIMARY KEY,
+  agency_id text,
+  route_short_name text,
+  route_long_name text,
+  route_desc text,
+  route_type integer,
+  route_url text,
+  route_color text,
+  route_text_color text
+);
+\copy routes FROM 'gtfs/routes.txt' WITH (FORMAT csv, HEADER true)
+
+DROP TABLE IF EXISTS stops;
+CREATE TABLE stops (
+  stop_id text PRIMARY KEY,
+  stop_code text,
+  stop_name text,
+  stop_desc text,
+  stop_lat float,
+  stop_lon float,
+  zone_id text,
+  stop_url text,
+  location_type integer,
+  parent_station text,
+  wheelchair_boarding integer
+);
+\copy stops FROM 'gtfs/stops.txt' WITH (FORMAT csv, HEADER true)
+ALTER TABLE stops ADD COLUMN stop_geom geometry(Point, 31370);
+UPDATE stops SET stop_geom = ST_Transform(ST_Point(stop_lon, stop_lat, 4326), 31370);
+CREATE INDEX ON stops USING gist (stop_geom);</pre><p>
+			The column <code class="varname">route_type</code> is 0 for the tram, 1 for the metro and 3 for the bus. The chapter on GTFS data shows how to build the planned trips from the rest of the timetable, to compare them with the trips that ran.
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05s04.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s06.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Building the Trajectories </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Exploring a Day of Service</td></tr></table></div></body></html>

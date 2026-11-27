@@ -1,0 +1,26 @@
+<html><head><meta charset="UTF-8"><title>Getting the Data</title><link rel="stylesheet" type="text/css" href="docbook.css"><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot"><link rel="home" href="index.html" title="MobilityDB Workshop"><link rel="up" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="prev" href="ch05.html" title="Chapter 5. Managing Real-Time Public Transport Data (STIB)"><link rel="next" href="ch05s03.html" title="Loading the Positions"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Getting the Data</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05.html">Prev</a> </td><th width="60%" align="center">Chapter 5. Managing Real-Time Public Transport Data (STIB)</th><td width="20%" align="right"> <a accesskey="n" href="ch05s03.html">Next</a></td></tr></table><hr></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a name="id2870"></a>Getting the Data</h2></div></div></div><p>Using the API requires a token. Registration on <a class="ulink" href="https://mobilitytwin.brussels/auth/register/" target="_top">MobilityTwin.Brussels</a> is free, and the token is shown on the account page. The data is not bundled with the workshop: each reader downloads it with their own token. We use the positions of Monday 16 November 2026. The API returns the addresses of the Parquet files covering a time range, which are downloaded without a token. A file covers a day in UTC, that is, from 1:00 to 1:00 in Brussels.
+			</p><pre class="programlisting">
+export MOBILITYTWIN_TOKEN=&lt;your token&gt;
+API=https://api.mobilitytwin.brussels
+# The Parquet file of the vehicle positions of Monday 16 November 2026 (UTC)
+curl -s -H "Authorization: Bearer $MOBILITYTWIN_TOKEN" \
+  "$API/stib/vehicle-trip/parquet?start_timestamp=2026-11-16T00:00:00Z&amp;end_timestamp=2026-11-17T00:00:00Z"
+# {"results": ["https://.../2026-11-16_00-00-00_to_2026-11-17_00-00-00.parquet"]}
+curl -s -o stib_2026-11-16.parquet \
+  https://motionlake.blob.core.windows.net/mobilitytwin/stib_vehicle_trip/2026-11-16_00-00-00_to_2026-11-17_00-00-00.parquet
+# The GTFS timetable that was valid on that day
+curl -s -H "Authorization: Bearer $MOBILITYTWIN_TOKEN" -o gtfs.zip \
+  "$API/stib/gtfs?timestamp=2026-11-16T12:00:00Z"
+unzip -q gtfs.zip -d gtfs</pre><p>
+		</p><p>The Parquet file has one row per vehicle and per poll. Its main columns are the following:
+			</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem"><p><code class="varname">uuid</code> identifies a vehicle for as long as it is tracked on one run.</p></li><li class="listitem"><p><code class="varname">lineId</code> and <code class="varname">routeId</code> are the line number and its GTFS route.</p></li><li class="listitem"><p><code class="varname">tripId</code> is the GTFS trip the vehicle is running. It is empty until the vehicle has called at its second stop, since which waiting vehicle makes the next departure cannot be known from the feed. It is inferred by the platform as the best match to the timetable.</p></li><li class="listitem"><p><code class="varname">delay</code> is the delay in seconds at the last stop called at, negative when early.</p></li><li class="listitem"><p><code class="varname">status</code> is <code class="varname">STOPPED_AT</code> or <code class="varname">IN_TRANSIT_TO</code>, and empty on the metro.</p></li><li class="listitem"><p><code class="varname">timestamp</code> is the time of the poll in Unix seconds, and <code class="varname">lon</code> and <code class="varname">lat</code> the position in WGS84.</p></li></ul></div><p>
+		</p><p>We convert the Parquet file into a CSV file with <a class="ulink" href="https://duckdb.org" target="_top">DuckDB</a>.
+			</p><pre class="programlisting">
+pip install duckdb
+python3 -c "
+import duckdb
+duckdb.sql('''COPY (SELECT uuid, lineId, directionId, direction, pointId,
+  distanceFromPoint, routeId, timestamp, tripId, startDate, startTime, delay,
+  status, stopId, stopSequence, lon, lat
+  FROM 'stib_2026-11-16.parquet') TO 'stib_positions.csv' (HEADER)''')"</pre><p>
+		</p></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s03.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter 5. Managing Real-Time Public Transport Data (STIB) </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> Loading the Positions</td></tr></table></div></body></html>

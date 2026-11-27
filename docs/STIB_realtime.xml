@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter id ="STIB_realtime">
+	<title>Managing Real-Time Public Transport Data (STIB)</title>
+
+	<para>The chapter on GTFS data builds the trips that the Brussels public transport company <ulink url="https://www.stib-mivb.be">STIB-MIVB</ulink> plans to run. This chapter loads the trips its vehicles actually ran: the positions of every bus, tram and metro, recorded every 20 seconds. It builds one trajectory per vehicle, explores a day of service, detects vehicles that stopped or crawled between stops, follows the vehicles live, and serves their trajectories as vector tiles for a map.</para>
+
+	<para>The data comes from <ulink url="https://mobilitytwin.brussels">MobilityTwin.Brussels</ulink>, a platform of the CoDE laboratory of the Université libre de Bruxelles that collects the open mobility data of Brussels. It polls the real-time API of STIB-MIVB every 20 seconds, follows each vehicle from poll to poll, and matches it to the GTFS trip it is running. The platform keeps the history of these positions since April 2024, one Parquet file per day, together with the GTFS timetable that was valid on each day. Its documentation asks the users of the data to cite the paper <ulink url="https://doi.org/10.1145/3589132.3625634">MobilityTwin.Brussels</ulink> by Gaspard Merten and Mahmoud Sakr (SIGSPATIAL 2023).</para>
+
+	<section>
+		<title>Contents</title>
+		<para>This module covers the following topics:
+			<itemizedlist>
+				<listitem><para>Downloading a day of vehicle positions and its GTFS timetable</para></listitem>
+				<listitem><para>Building one trajectory per vehicle, with gaps, together with temporal attributes: the GTFS trip, the delay, and the status at a stop</para></listitem>
+				<listitem><para>Computing commercial speeds and delays per line</para></listitem>
+				<listitem><para>Detecting vehicles that stopped or crawled between stops</para></listitem>
+				<listitem><para>Appending the positions of the live feed to the trajectories</para></listitem>
+				<listitem><para>Serving the trajectories as Mapbox vector tiles</para></listitem>
+			</itemizedlist>
+		</para>
+	</section>
+
+	<section>
+		<title>Getting the Data</title>
+		<para>Using the API requires a token. Registration on <ulink url="https://mobilitytwin.brussels/auth/register/">MobilityTwin.Brussels</ulink> is free, and the token is shown on the account page. The data is not bundled with the workshop: each reader downloads it with their own token. We use the positions of Monday 16 November 2026. The API returns the addresses of the Parquet files covering a time range, which are downloaded without a token. A file covers a day in UTC, that is, from 1:00 to 1:00 in Brussels.
+			<programlisting language="bash" xml:space="preserve">
+export MOBILITYTWIN_TOKEN=&lt;your token&gt;
+API=https://api.mobilitytwin.brussels
+# The Parquet file of the vehicle positions of Monday 16 November 2026 (UTC)
+curl -s -H "Authorization: Bearer $MOBILITYTWIN_TOKEN" \
+  "$API/stib/vehicle-trip/parquet?start_timestamp=2026-11-16T00:00:00Z&amp;end_timestamp=2026-11-17T00:00:00Z"
+# {"results": ["https://.../2026-11-16_00-00-00_to_2026-11-17_00-00-00.parquet"]}
+curl -s -o stib_2026-11-16.parquet \
+  https://motionlake.blob.core.windows.net/mobilitytwin/stib_vehicle_trip/2026-11-16_00-00-00_to_2026-11-17_00-00-00.parquet
+# The GTFS timetable that was valid on that day
+curl -s -H "Authorization: Bearer $MOBILITYTWIN_TOKEN" -o gtfs.zip \
+  "$API/stib/gtfs?timestamp=2026-11-16T12:00:00Z"
+unzip -q gtfs.zip -d gtfs</programlisting>
+		</para>
+		<para>The Parquet file has one row per vehicle and per poll. Its main columns are the following:
+			<itemizedlist>
+				<listitem><para><varname>uuid</varname> identifies a vehicle for as long as it is tracked on one run.</para></listitem>
+				<listitem><para><varname>lineId</varname> and <varname>routeId</varname> are the line number and its GTFS route.</para></listitem>
+				<listitem><para><varname>tripId</varname> is the GTFS trip the vehicle is running. It is empty until the vehicle has called at its second stop, since which waiting vehicle makes the next departure cannot be known from the feed. It is inferred by the platform as the best match to the timetable.</para></listitem>
+				<listitem><para><varname>delay</varname> is the delay in seconds at the last stop called at, negative when early.</para></listitem>
+				<listitem><para><varname>status</varname> is <varname>STOPPED_AT</varname> or <varname>IN_TRANSIT_TO</varname>, and empty on the metro.</para></listitem>
+				<listitem><para><varname>timestamp</varname> is the time of the poll in Unix seconds, and <varname>lon</varname> and <varname>lat</varname> the position in WGS84.</para></listitem>
+			</itemizedlist>
+		</para>
+		<para>We convert the Parquet file into a CSV file with <ulink url="https://duckdb.org">DuckDB</ulink>.
+			<programlisting language="bash" xml:space="preserve">
+pip install duckdb
+python3 -c "
+import duckdb
+duckdb.sql('''COPY (SELECT uuid, lineId, directionId, direction, pointId,
+  distanceFromPoint, routeId, timestamp, tripId, startDate, startTime, delay,
+  status, stopId, stopSequence, lon, lat
+  FROM 'stib_2026-11-16.parquet') TO 'stib_positions.csv' (HEADER)''')"</programlisting>
+		</para>
+	</section>
+
+	<section>
+		<title>Loading the Positions</title>
+		<para>We create a database <varname>stib</varname> with the extension, and set its time zone to the one of Brussels, in which all the times of this chapter are shown.
+			<programlisting language="sql" xml:space="preserve">
+CREATE EXTENSION mobilitydb CASCADE;
+ALTER DATABASE stib SET TimeZone = 'Europe/Brussels';</programlisting>
+			We then connect again and load the CSV file, from the directory of the downloaded files.
+			<programlisting language="sql" xml:space="preserve">
+DROP TABLE IF EXISTS stib_input;
+CREATE TABLE stib_input (
+  uuid text,
+  line_id text,
+  direction_id text,
+  direction integer,
+  point_id text,
+  distance_from_point float,
+  route_id text,
+  epoch double precision,
+  trip_id text,
+  start_date text,
+  start_time text,
+  delay integer,
+  status text,
+  stop_id text,
+  stop_sequence integer,
+  lon float,
+  lat float
+);
+\copy stib_input FROM 'stib_positions.csv' WITH (FORMAT csv, HEADER true)
+
+DROP TABLE IF EXISTS stib_positions;
+CREATE TABLE stib_positions AS
+SELECT uuid AS vehicle_id, line_id, route_id, direction, trip_id, delay, status,
+  to_timestamp(epoch) AS t,
+  ST_Transform(ST_Point(lon, lat, 4326), 31370) AS geom
+FROM stib_input;
+CREATE INDEX ON stib_positions (vehicle_id, t);</programlisting>
+			The table <varname>stib_positions</varname> keeps the columns we use, with the time as a <varname>timestamptz</varname> and the position in the Belgian Lambert 72 projection (EPSG:31370), so that distances are measured in metres.
+			<programlisting language="sql" xml:space="preserve">
+SELECT count(*) AS positions, count(DISTINCT vehicle_id) AS runs,
+  min(t), max(t) FROM stib_positions;
+--  positions | runs  |              min              |             max              
+-- -----------+-------+-------------------------------+------------------------------
+--    2256768 | 24711 | 2026-11-16 01:00:00.109004+01 | 2026-11-17 00:59:59.22366+01
+-- (1 row)</programlisting>
+		</para>
+	</section>
+
+	<section>
+		<title>Building the Trajectories</title>
+		<para>We build one row per vehicle run, with its trajectory and three temporal attributes.
+			<programlisting language="sql" xml:space="preserve">
+DROP TABLE IF EXISTS stib_vehicles;
+CREATE TABLE stib_vehicles AS
+SELECT vehicle_id, line_id, route_id,
+  appendInstant(tgeompoint(geom, t), 'linear', 1000.0, interval '2 minutes'
+    ORDER BY t) AS trip,
+  appendInstant(ttext(trip_id, t), 'step', interval '2 minutes' ORDER BY t)
+    FILTER (WHERE trip_id IS NOT NULL) AS trip_id,
+  appendInstant(tint(delay, t), 'step', NULL, interval '2 minutes' ORDER BY t)
+    FILTER (WHERE delay IS NOT NULL) AS delay,
+  appendInstant(ttext(status, t), 'step', interval '2 minutes' ORDER BY t)
+    FILTER (WHERE status IS NOT NULL) AS status
+FROM stib_positions
+GROUP BY vehicle_id, line_id, route_id;
+
+DELETE FROM stib_vehicles WHERE numInstants(trip) = 1;
+UPDATE stib_vehicles v
+SET trip = (SELECT tgeompointSeqSet(array_agg(s ORDER BY startTimestamp(s)))
+  FROM unnest(sequences(v.trip)) AS s WHERE numInstants(s) &gt; 1)
+WHERE numSequences(v.trip) &gt; 1;
+DELETE FROM stib_vehicles WHERE trip IS NULL;
+CREATE INDEX ON stib_vehicles USING gist (trip);</programlisting>
+			The aggregate function <varname>appendInstant</varname> appends the positions of a run in time order. Its arguments give the interpolation, linear for the position and step for the attributes, and the gaps: a new sequence starts when two consecutive positions are more than 1,000 metres or 2 minutes apart, so that the trajectory does not invent a path across a missing stretch of data. A temporal text <varname>trip_id</varname> keeps the GTFS trip of the run over time, since a run can carry several trips and a trip can be carried by several runs when the platform loses a vehicle and finds it again. A temporal integer <varname>delay</varname> and a temporal text <varname>status</varname> keep the delay and the status at a stop. The trajectory keeps only the positions it needs: a position on the straight line between its neighbours at the matching time adds nothing.
+			<programlisting language="sql" xml:space="preserve">
+SELECT count(*) AS runs, sum(numInstants(trip)) AS instants,
+  sum(numSequences(trip)) AS sequences,
+  pg_size_pretty(pg_total_relation_size('stib_vehicles')) AS size
+FROM stib_vehicles;
+--  runs  | instants | sequences | size  
+-- -------+----------+-----------+-------
+--  23875 |  1513338 |     26844 | 79 MB
+-- (1 row)</programlisting>
+			The day's 2,256,768 positions become 1,513,338 instants. A run made of a single position, and an isolated position between two gaps, describe no movement and are removed by the <varname>DELETE</varname> and <varname>UPDATE</varname> statements above.
+		</para>
+	</section>
+
+	<section>
+		<title>Loading the Routes and Stops</title>
+		<para>From the GTFS timetable of the day we only need the routes, which give the mode of each line, and the stops.
+			<programlisting language="sql" xml:space="preserve">
+DROP TABLE IF EXISTS routes;
+CREATE TABLE routes (
+  route_id text PRIMARY KEY,
+  agency_id text,
+  route_short_name text,
+  route_long_name text,
+  route_desc text,
+  route_type integer,
+  route_url text,
+  route_color text,
+  route_text_color text
+);
+\copy routes FROM 'gtfs/routes.txt' WITH (FORMAT csv, HEADER true)
+
+DROP TABLE IF EXISTS stops;
+CREATE TABLE stops (
+  stop_id text PRIMARY KEY,
+  stop_code text,
+  stop_name text,
+  stop_desc text,
+  stop_lat float,
+  stop_lon float,
+  zone_id text,
+  stop_url text,
+  location_type integer,
+  parent_station text,
+  wheelchair_boarding integer
+);
+\copy stops FROM 'gtfs/stops.txt' WITH (FORMAT csv, HEADER true)
+ALTER TABLE stops ADD COLUMN stop_geom geometry(Point, 31370);
+UPDATE stops SET stop_geom = ST_Transform(ST_Point(stop_lon, stop_lat, 4326), 31370);
+CREATE INDEX ON stops USING gist (stop_geom);</programlisting>
+			The column <varname>route_type</varname> is 0 for the tram, 1 for the metro and 3 for the bus. The chapter on GTFS data shows how to build the planned trips from the rest of the timetable, to compare them with the trips that ran.
+		</para>
+	</section>
+
+	<section>
+		<title>Exploring a Day of Service</title>
+		<para>The commercial speed of each mode is the distance its vehicles travelled divided by the time they were tracked, stops and layovers included.
+			<programlisting language="sql" xml:space="preserve">
+SELECT CASE r.route_type WHEN 0 THEN 'tram' WHEN 1 THEN 'metro' ELSE 'bus' END AS mode,
+  count(*) AS runs, round(sum(length(trip)) / 1000) AS km,
+  round((sum(length(trip)) / extract(epoch FROM sum(duration(trip))) * 3.6)::numeric, 1) AS kmh
+FROM stib_vehicles v JOIN routes r USING (route_id)
+GROUP BY 1 ORDER BY 1;
+--  mode  | runs  |  km   | kmh  
+-- -------+-------+-------+------
+--  bus   | 15151 | 82947 | 10.0
+--  metro |  1453 | 14424 | 18.7
+--  tram  |  7271 | 45021 | 11.1
+-- (3 rows)</programlisting>
+			The metro is only observed at its stations, so its trajectory is the straight line between consecutive stations, which slightly underestimates its distance.
+		</para>
+		<para>The slowest lines during the morning peak are obtained by restricting the trajectories to the period from 8:00 to 9:00 with the function <varname>atTime</varname>. The operator <varname>&amp;&amp;</varname> keeps the runs whose bounding box overlaps the period, using the GiST index of the table.
+			<programlisting language="sql" xml:space="preserve">
+SELECT line_id, count(*) AS runs,
+  round((sum(length(atTime(trip, p))) /
+    extract(epoch FROM sum(duration(atTime(trip, p)))) * 3.6)::numeric, 1) AS kmh
+FROM stib_vehicles,
+  LATERAL (SELECT tstzspan '[2026-11-16 08:00, 2026-11-16 09:00)' AS p) AS s
+WHERE trip &amp;&amp; p
+GROUP BY line_id HAVING count(*) &gt;= 10
+ORDER BY kmh LIMIT 5;
+--  line_id | runs | kmh 
+-- ---------+------+-----
+--  T81     |   23 | 7.1
+--  34      |   31 | 7.5
+--  64      |   24 | 7.9
+--  86      |   32 | 8.0
+--  29      |   32 | 8.2
+-- (5 rows)</programlisting>
+		</para>
+		<para>The trajectory of one GTFS trip is the part of a run during which its temporal attribute <varname>trip_id</varname> had the trip as value. The operator <varname>?=</varname> keeps the runs that ever carried the trip, and the function <varname>whenTrue</varname> returns the periods during which the trip was carried.
+			<programlisting language="sql" xml:space="preserve">
+SELECT vehicle_id,
+  startTimestamp(whenTrue(trip_id #= '134460577341186002'::text))::time(0) AS since,
+  round(length(atTime(trip, whenTrue(trip_id #= '134460577341186002'::text)))) AS metres,
+  duration(whenTrue(trip_id #= '134460577341186002'::text))::interval(0) AS duration
+FROM stib_vehicles
+WHERE trip_id ?= '134460577341186002'::text
+ORDER BY since;
+--               vehicle_id              |  since   | metres | duration 
+-- --------------------------------------+----------+--------+----------
+--  022ff490-1234-4635-bf73-48f8003afa7a | 08:04:02 |   1845 | 00:10:28
+--  b58377f3-6e03-4d18-ae0a-e1735a79ee9d | 08:14:30 |   5642 | 00:29:26
+-- (2 rows)</programlisting>
+			The trip was carried by two runs: the platform lost the vehicle after 1.8 kilometres and found it again as a new run.
+		</para>
+		<para>The time-weighted average of the delay, computed with the function <varname>twAvg</varname>, weighs each value by how long it held, and the function <varname>maxValue</varname> returns the largest delay of a run.
+			<programlisting language="sql" xml:space="preserve">
+SELECT line_id, round((avg(twAvg(delay)) / 60)::numeric, 1) AS avg_delay_min,
+  max(maxValue(delay)) / 60 AS max_delay_min
+FROM stib_vehicles WHERE delay IS NOT NULL
+GROUP BY line_id ORDER BY avg_delay_min DESC LIMIT 5;
+--  line_id | avg_delay_min | max_delay_min 
+-- ---------+---------------+---------------
+--  36      |           2.2 |            17
+--  77      |           2.1 |            12
+--  75      |           1.9 |            22
+--  73      |           1.9 |            12
+--  79      |           1.9 |            22
+-- (5 rows)</programlisting>
+		</para>
+	</section>
+
+	<section>
+		<title>Detecting Incidents</title>
+		<para>A vehicle that stays still for several minutes away from any stop is a sign of an incident: a breakdown, an accident, or a blocked track. The function <varname>stops</varname> returns the parts of a trajectory during which the vehicle stayed within a given distance, here 20 metres, for at least a given duration, here 3 minutes. We ignore the metro, which is only observed at its stations, the stops at the start and at the end of a run, which are layovers at a terminus, and the stops within 50 metres of a stop of the network. The status of the feed cannot replace this last test: a vehicle waiting at a terminus can be reported <varname>IN_TRANSIT_TO</varname> its first stop.
+			<programlisting language="sql" xml:space="preserve">
+DROP TABLE IF EXISTS stopped;
+CREATE TABLE stopped AS
+SELECT v.vehicle_id, v.line_id, s.stop
+FROM stib_vehicles v JOIN routes r USING (route_id),
+  unnest(sequences(stops(v.trip, 20.0, interval '3 minutes'))) AS s(stop)
+WHERE r.route_type &lt;&gt; 1
+  AND startTimestamp(s.stop) &gt; startTimestamp(v.trip)
+  AND endTimestamp(s.stop) &lt; endTimestamp(v.trip)
+  AND NOT EXISTS (SELECT 1 FROM stops p
+    WHERE ST_DWithin(p.stop_geom, startValue(s.stop), 50.0));
+SELECT count(*) AS alarms, count(DISTINCT vehicle_id) AS vehicles FROM stopped;
+SELECT line_id, startTimestamp(stop)::time(0) AS since,
+  duration(stop)::interval(0) AS stopped_for, n.stop_name AS nearest_stop,
+  round(ST_Distance(startValue(stop), n.stop_geom)) AS metres
+FROM stopped, LATERAL (SELECT stop_name, stop_geom FROM stops
+  ORDER BY stop_geom &lt;-&gt; startValue(stop) LIMIT 1) AS n
+ORDER BY duration(stop) DESC LIMIT 5;
+--  alarms | vehicles 
+-- --------+----------
+--     755 |      705
+-- (1 row)
+--
+--  line_id |  since   | stopped_for |  nearest_stop   | metres 
+-- ---------+----------+-------------+-----------------+--------
+--  42      | 14:19:53 | 00:39:09    | VIADUC E40      |     54
+--  89      | 15:33:49 | 00:29:04    | DELACROIX       |    205
+--  87      | 19:31:36 | 00:28:39    | GARE DE BERCHEM |    108
+--  95      | 09:18:17 | 00:26:46    | SCIENCE         |     88
+--  T81     | 16:14:15 | 00:24:59    | CONSEIL         |     60
+-- (5 rows)</programlisting>
+		</para>
+		<para>A vehicle crawling in traffic moves, but slowly. The function <varname>speed</varname> returns the speed of a trajectory in metres per second as a temporal float, the comparison <varname>#&lt;</varname> returns a temporal Boolean that is true while the speed is below 5 km/h, and the function <varname>whenTrue</varname> returns the periods during which it is true. We keep the periods of at least 5 minutes during which the vehicle moved at least 50 metres, which leaves out the time spent at a stop.
+			<programlisting language="sql" xml:space="preserve">
+DROP TABLE IF EXISTS slowed;
+CREATE TABLE slowed AS
+SELECT v.vehicle_id, v.line_id, p AS period, length(atTime(v.trip, p)) AS metres
+FROM stib_vehicles v JOIN routes r USING (route_id),
+  unnest(spans(whenTrue(speed(v.trip) #&lt; 5 / 3.6))) AS p
+WHERE r.route_type &lt;&gt; 1 AND duration(p) &gt;= interval '5 minutes'
+  AND length(atTime(v.trip, p)) &gt;= 50.0;
+SELECT extract(hour FROM lower(period)) AS hour, count(*) AS alarms
+FROM slowed GROUP BY 1 ORDER BY 1;
+--  hour | alarms 
+-- ------+--------
+--     0 |      2
+--     5 |      1
+--     6 |      4
+--     7 |     18
+--     8 |     30
+--     9 |     45
+--    10 |      4
+--    11 |     17
+--    12 |     12
+--    13 |     10
+--    14 |     11
+--    15 |     20
+--    16 |     46
+--    17 |     67
+--    18 |     45
+--    19 |      8
+--    20 |      7
+--    21 |      4
+--    22 |      3
+--    23 |      1
+-- (20 rows)</programlisting>
+			The alarms concentrate in the morning and in the evening peaks.
+		</para>
+	</section>
+
+	<section>
+		<title>Following the Vehicles Live</title>
+		<para>The endpoint <varname>/stib/vehicle-trip</varname> returns the latest positions as GeoJSON. The table <varname>live_vehicles</varname> keeps the trajectory of each run, and the function <varname>stib_ingest</varname> appends the positions of a snapshot to it with the function <varname>appendInstant</varname>. A snapshot read twice appends nothing, since a position is only appended after the last one of its trajectory.
+			<programlisting language="sql" xml:space="preserve">
+DROP TABLE IF EXISTS live_vehicles;
+CREATE TABLE live_vehicles (
+  vehicle_id text PRIMARY KEY,
+  line_id text,
+  route_id text,
+  trip_id ttext,
+  trip tgeompoint
+);
+
+CREATE OR REPLACE FUNCTION stib_ingest(snapshot jsonb)
+RETURNS integer AS $$
+  WITH f AS (
+    SELECT f-&gt;'properties' AS p,
+      ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(f-&gt;'geometry'), 4326), 31370) AS geom
+    FROM jsonb_array_elements(snapshot-&gt;'features') AS f ),
+  n AS (
+    SELECT p-&gt;&gt;'uuid' AS vehicle_id, p-&gt;&gt;'lineId' AS line_id, p-&gt;&gt;'routeId' AS route_id,
+      to_timestamp((p-&gt;&gt;'timestamp')::float) AS t, p-&gt;&gt;'tripId' AS trip_id, geom
+    FROM f ),
+  upsert AS (
+    INSERT INTO live_vehicles AS l (vehicle_id, line_id, route_id, trip_id, trip)
+    SELECT vehicle_id, line_id, route_id, ttext(trip_id, t), tgeompoint(geom, t)
+    FROM n
+    ON CONFLICT (vehicle_id) DO UPDATE
+    SET trip = appendInstant(l.trip, EXCLUDED.trip),
+      trip_id = CASE
+        WHEN EXCLUDED.trip_id IS NULL THEN l.trip_id
+        WHEN l.trip_id IS NULL THEN EXCLUDED.trip_id
+        ELSE appendInstant(l.trip_id, EXCLUDED.trip_id) END
+    WHERE getTimestamp(EXCLUDED.trip) &gt; endTimestamp(l.trip)
+    RETURNING 1 )
+  SELECT count(*)::integer FROM upsert;
+$$ LANGUAGE sql;</programlisting>
+		</para>
+		<para>The following script polls the endpoint every 20 seconds and passes each snapshot to the function. The command <varname>\set</varname> of <varname>psql</varname> reads the snapshot into a variable, which a command-line argument could not hold.
+			<programlisting language="bash" xml:space="preserve">
+#!/bin/bash
+# Poll the STIB vehicle positions of MobilityTwin.Brussels every 20 seconds
+# and append them to the trajectories of table live_vehicles.
+# Usage: MOBILITYTWIN_TOKEN=... ./stib_live.sh [database]
+DB=${1:-stib}
+URL=https://api.mobilitytwin.brussels/stib/vehicle-trip
+while true; do
+  if curl -sf -H "Authorization: Bearer $MOBILITYTWIN_TOKEN" "$URL" -o snapshot.json; then
+    psql -X -q -At -d "$DB" &lt;&lt;'EOF'
+\set s `cat snapshot.json`
+SELECT now()::time(0) AS polled, stib_ingest(:'s') AS appended;
+EOF
+  fi
+  sleep 20
+done</programlisting>
+			Each line printed is a poll and the number of runs whose trajectory grew. While the script runs, the vehicles that have been standing still for at least 3 minutes away from any stop are obtained as follows.
+			<programlisting language="sql" xml:space="preserve">
+SELECT l.line_id, l.vehicle_id, duration(s)::interval(0) AS stopped_for,
+  ST_AsText(ST_Transform(endValue(s), 4326)) AS position
+FROM live_vehicles l,
+  unnest(sequences(stops(atTime(l.trip, span(now() - interval '15 minutes', now())),
+    20.0, interval '3 minutes'))) AS s
+WHERE tempSubType(l.trip) &lt;&gt; 'Instant'
+  AND startTimestamp(s) &gt; startTimestamp(l.trip)
+  AND endTimestamp(s) = endTimestamp(l.trip)
+  AND NOT EXISTS (SELECT 1 FROM stops p
+    WHERE ST_DWithin(p.stop_geom, endValue(s), 50.0));</programlisting>
+			The function <varname>atTime</varname> keeps the last 15 minutes of each trajectory, and a vehicle is still standing when its last stop ends with its trajectory. As for the day of service, a stop starting with the trajectory is left out: the vehicle has not moved since the script started, which is how a layover looks.
+		</para>
+	</section>
+
+	<section>
+		<title>Serving Vector Tiles</title>
+		<para>A map shows the trajectories as <ulink url="https://github.com/mapbox/vector-tile-spec">Mapbox vector tiles</ulink>. The following function returns the tile <varname>z/x/y</varname> of the trajectories during a period. The function <varname>asMVTGeom</varname> clips a trajectory to the tile and returns its geometry in tile coordinates together with the time of each of its points, which a client uses to animate the vehicles.
+			<programlisting language="sql" xml:space="preserve">
+CREATE OR REPLACE FUNCTION stib_tile(z integer, x integer, y integer,
+  p_start timestamptz, p_end timestamptz)
+RETURNS bytea AS $$
+  WITH bounds AS (
+    SELECT ST_TileEnvelope(z, x, y) AS geom ),
+  vals AS (
+    SELECT v.vehicle_id, v.line_id,
+      asMVTGeom(transform(s, 3857), stbox(b.geom)) AS geom_times
+    FROM stib_vehicles v, bounds b,
+      unnest(sequences(atTime(v.trip, span(p_start, p_end)))) AS s
+    WHERE v.trip &amp;&amp; stbox(ST_Transform(b.geom, 31370), span(p_start, p_end)) ),
+  mvtgeom AS (
+    SELECT (geom_times).geom, (geom_times).times, vehicle_id, line_id
+    FROM vals
+    WHERE GeometryType((geom_times).geom) &lt;&gt; 'GEOMETRYCOLLECTION' )
+  SELECT ST_AsMVT(mvtgeom) FROM mvtgeom;
+$$ LANGUAGE sql STABLE PARALLEL SAFE;</programlisting>
+			Each sequence of a trajectory is a feature of its own. When the part of a sequence inside the tile is made of lines and of an isolated position, <varname>asMVTGeom</varname> returns a collection of lines and a point, which a vector tile cannot encode; the function leaves these rare pieces out.
+			<programlisting language="sql" xml:space="preserve">
+SELECT length(stib_tile(13, 4195, 2748, '2026-11-16 08:00', '2026-11-16 08:15'))
+  AS bytes;
+--  bytes 
+-- -------
+--  61423
+-- (1 row)</programlisting>
+			A tile server that publishes PostgreSQL functions, such as <ulink url="https://github.com/CrunchyData/pg_tileserv">pg_tileserv</ulink> or <ulink url="https://github.com/maplibre/martin">Martin</ulink>, serves this function to a web map.
+		</para>
+	</section>
+</chapter>
